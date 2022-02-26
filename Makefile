@@ -3,7 +3,7 @@ CC=clang
 LD=clang
 
 AS_FLAGS=-f elf64 -F dwarf
-CC_FLAGS=-mno-mmx -mno-sse -mno-sse2 -fno-pie -g -mno-red-zone -std=gnu99 -ffreestanding -nostdlib -O0 -Wall -Wextra -Werror -fno-stack-protector
+CC_FLAGS=-mno-mmx -mno-sse -mno-sse2 -fno-pie -g -mno-red-zone -std=gnu99 -ffreestanding -nostdlib -O0 -Wall -Wextra -Werror -Wnewline-eof -fno-stack-protector
 LD_FLAGS=-ffreestanding -O0 -no-pie -nostdlib -fno-stack-protector
 
 OBJCOPY=objcopy
