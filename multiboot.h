@@ -53,7 +53,6 @@ typedef struct __attribute__((packed)) mb_memmap_entry
 typedef struct mb_memmap_iter
 {
     mb_memmap_entry_t *curr_entry;
-    int remaining_entries;
 } mb_memmap_iter_t;
 
 extern mb_fb_info_t *mb_fb_info;
@@ -74,7 +73,8 @@ void mb_memmap_iter_init(mb_memmap_iter_t *it);
 
 /**
  * Returns next memory region from given iterator. 
- * If there are no more regions, NULL is returned instead
+ * If there are no more regions, NULL is returned instead. 
+ * mb_memmap_info must be valid during iteration, UB otherwise
  * 
  * \param it Iterator
  */

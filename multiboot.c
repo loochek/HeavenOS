@@ -35,7 +35,7 @@ void mb_parse_boot_info()
             break;
 
         case MB_TAG_MEMMAP:
-            // Memory mab
+            // Memory map
             mb_memmap_info = (mb_memmap_info_t*)curr_tag;
             break;
 
@@ -55,18 +55,16 @@ void mb_memmap_iter_init(mb_memmap_iter_t *it)
     kassert_dbg(it != NULL);
 
     it->curr_entry = (mb_memmap_entry_t*)(mb_memmap_info + 1);
-    it->remaining_entries = (mb_memmap_info->header.size - sizeof(mb_memmap_info_t)) / mb_memmap_info->entry_size;
 }
 
 mb_memmap_entry_t *mb_memmap_iter_next(mb_memmap_iter_t *it)
 {
     kassert_dbg(it != NULL);
     
-    if (it->remaining_entries == 0)
+    if ((uint8_t*)it->curr_entry >= (uint8_t*)mb_memmap_info + mb_memmap_info->header.size)
         return NULL;
 
     mb_memmap_entry_t *ret = it->curr_entry;
     it->curr_entry = (mb_memmap_entry_t*)((uint8_t*)it->curr_entry + mb_memmap_info->entry_size);
-    it->remaining_entries--;
     return ret;
 }
