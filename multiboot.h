@@ -50,16 +50,24 @@ typedef struct __attribute__((packed)) mb_memmap_entry
     uint32_t reserved;
 } mb_memmap_entry_t;
 
+typedef struct __attribute__((packed)) mb_rsdp_t
+{
+    mb_tag_header_t header;
+    uint8_t rsdp[0];
+} mb_rsdp_t;
+
 typedef struct mb_memmap_iter
 {
     mb_memmap_entry_t *curr_entry;
 } mb_memmap_iter_t;
 
-extern mb_fb_info_t *mb_fb_info;
+extern mb_fb_info_t     *mb_fb_info;
 extern mb_memmap_info_t *mb_memmap_info;
+extern mb_rsdp_t        *mb_acpi_rsdp_v1;
+extern mb_rsdp_t        *mb_acpi_rsdp_v2;
 
 /**
- * Parses Multiboot boot information and fills global structures mb_fb_info, ...
+ * Parses Multiboot boot information and fills global pointers
  */
 void mb_parse_boot_info();
 

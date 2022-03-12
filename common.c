@@ -1,26 +1,7 @@
-#ifndef COMMON_H
-#define COMMON_H
-
 #include <stdint.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
 
-/// HeavenOS version to display
-#define HEAVENOS_VERSION "hw2-dev"
-
-/* Round down to the nearest multiple of n */
-#define ROUNDDOWN(a, n) ({        \
-    uint64_t __a = (uint64_t)(a); \
-    (typeof(a))(__a - __a % (n)); })
-
-/* Round up to the nearest multiple of n */
-#define ROUNDUP(a, n) ({                                  \
-    uint64_t __n = (uint64_t)(n);                         \
-    (typeof(a))(ROUNDDOWN((uint64_t)(a) + __n - 1, __n)); })
-
-static inline int memcmp(const void* str1, const void* str2, size_t count)
+int memcmp(const void* str1, const void* str2, size_t count)
 {
     const uint8_t *s1 = (const uint8_t*)str1;
     const uint8_t *s2 = (const uint8_t*)str2;
@@ -35,7 +16,7 @@ static inline int memcmp(const void* str1, const void* str2, size_t count)
     return 0;
 }
 
-static inline void memset(void* p, int ch, size_t sz)
+void memset(void* p, int ch, size_t sz)
 {
     uint8_t* ptr = (uint8_t*)p;
     while (sz > 0)
@@ -46,7 +27,7 @@ static inline void memset(void* p, int ch, size_t sz)
     }
 }
 
-static inline void memcpy(void* dst, void* src, size_t sz)
+void memcpy(void* dst, void* src, size_t sz)
 {
     uint8_t* d = dst;
     const uint8_t* s = src;
@@ -59,7 +40,7 @@ static inline void memcpy(void* dst, void* src, size_t sz)
     }
 }
 
-static inline void memmove(void *dst, const void *src, size_t n)
+void memmove(void *dst, const void *src, size_t n)
 {
     const uint8_t *s = src;
     uint8_t *d = dst;
@@ -87,15 +68,3 @@ static inline void memmove(void *dst, const void *src, size_t n)
         }
     }
 }
-
-static inline size_t strlen(const char* str)
-{
-	size_t len = 0;
-	while (str[len])
-    {
-		len++;
-    }
-	return len;
-}
-
-#endif

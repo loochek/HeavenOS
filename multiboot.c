@@ -4,15 +4,19 @@
 
 const int MB_TAG_ALIGNMENT = 8;
 
-const uint32_t MB_TAG_END    = 0;
-const uint32_t MB_TAG_MEMMAP = 6;
-const uint32_t MB_TAG_FB     = 8;
+const uint32_t MB_TAG_END     = 0;
+const uint32_t MB_TAG_MEMMAP  = 6;
+const uint32_t MB_TAG_FB      = 8;
+const uint32_t MB_TAG_RSDP_V1 = 14;
+const uint32_t MB_TAG_RSDP_V2 = 15;
 
 // To be filled by entry point code
 extern uint8_t *mb_boot_info;
 
-mb_fb_info_t     *mb_fb_info     = NULL;
-mb_memmap_info_t *mb_memmap_info = NULL;
+mb_fb_info_t     *mb_fb_info      = NULL;
+mb_memmap_info_t *mb_memmap_info  = NULL;
+mb_rsdp_t        *mb_acpi_rsdp_v1 = NULL;
+mb_rsdp_t        *mb_acpi_rsdp_v2 = NULL;
 
 void mb_parse_boot_info()
 {
@@ -42,6 +46,16 @@ void mb_parse_boot_info()
         case MB_TAG_FB:
             // Framebuffer
             mb_fb_info = (mb_fb_info_t*)curr_tag;
+            break;
+
+        case MB_TAG_RSDP_V1:
+            // ACPI 1.0 RSDP
+            mb_acpi_rsdp_v1 = (mb_rsdp_t*)curr_tag;
+            break;
+
+        case MB_TAG_RSDP_V2:
+            // ACPI 2.0 RSDP
+            mb_acpi_rsdp_v2 = (mb_rsdp_t*)curr_tag;
             break;
         }
 

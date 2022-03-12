@@ -2,7 +2,7 @@ AS=nasm
 CC=clang
 LD=clang
 
-AS_FLAGS=-f elf64 -F dwarf
+AS_FLAGS=-f elf64 -g -F dwarf
 CC_FLAGS=-mno-mmx -mno-sse -mno-sse2 -fno-pie -g -mno-red-zone -std=gnu99 -ffreestanding -nostdlib -O0 -Wall -Wextra -Werror -Wnewline-eof -fno-stack-protector
 LD_FLAGS=-ffreestanding -O0 -no-pie -nostdlib -fno-stack-protector
 
@@ -25,7 +25,7 @@ kernel.iso: kernel.bin
 %.o: %.asm
 	$(AS) $(AS_FLAGS) -o $@ $<
 
-kernel.bin: boot.o kernel.o multiboot.o fb.o console.o printk.o panic.c
+kernel.bin: boot.o common.o kernel.o multiboot.o fb.o console.o printk.o panic.o acpi.o apic.o irq.o irq_asm.o
 	$(LD) $(LD_FLAGS) -T linker.ld -o $@ $^
 
 qemu: kernel.iso
