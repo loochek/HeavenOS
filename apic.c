@@ -1,6 +1,15 @@
 #include "apic.h"
 #include "panic.h"
 #include "irq.h"
+#include "x86.h"
+
+// APIC timer period in milliseconds
+#define APIC_TIMER_PERIOD 1
+
+// APIC callibration period in milliseconds
+#define CALLIBRATE_PERIOD 10
+
+// APIC
 
 #define TYPE_LAPIC          0
 #define TYPE_IOAPIC         1
@@ -40,8 +49,19 @@
 #define APIC_DELIVS      0x1000
 #define TMR_PERIODIC     0x20000
 #define TMR_BASEDIV      (1<<20)
+#define TMR_DIV_X1       0xB
 
 #define IOAPIC_REG_TABLE  0x10
+
+// PIT
+#define CMD_BINARY    0x00 // Use Binary counter values
+#define PIT_COUNTER2  0x42
+#define PIT_CMD       0x43
+#define PIT_CH2_GATE  0x61
+#define CMD_MODE1     0x02 // Hardware Retriggerable One-Shot
+#define CMD_RW_BOTH   0x30 // Least followed by Most Significant Byte
+#define CMD_COUNTER2  0x80
+#define PIT_FREQUENCY 1193182
 
 typedef struct ioapic
 {
@@ -68,20 +88,15 @@ typedef struct __attribute__((packed)) madt_header
 volatile uint32_t* lapic_ptr = NULL;
 volatile ioapic_t* ioapic_ptr = NULL;
 
-static inline void outb(uint16_t port, uint8_t data)
-{
-    asm volatile("out %0,%1" : : "a" (data), "d" (port));
-}
-
 static void lapic_write(size_t idx, uint32_t value)
 {
     lapic_ptr[idx / 4] = value;
 }
 
-// static uint32_t lapic_read(size_t idx)
-// {
-//     return lapic_ptr[idx / 4];
-// }
+static uint32_t lapic_read(size_t idx)
+{
+    return lapic_ptr[idx / 4];
+}
 
 // static void ioapic_write(int reg, uint32_t data)
 // {
@@ -153,15 +168,41 @@ void apic_init()
 
 void apic_setup_timer()
 {
-    // TODO: calibrate APIC timer to fire interrupt every millisecond.
+    // Setup APIC timer for callibration
+    lapic_write(APIC_LVT_TMR, IRQ_TIMER);
+    lapic_write(APIC_TMRDIV, TMR_DIV_X1);
 
-    // APIC timer setup.
-    // Divide Configuration Registers, set to X1
-    lapic_write(APIC_TMRDIV, 0xB);
-    // Interrupt vector and timer mode.
+    // Using PIT to callibrate APIC timer
+    // PIT Channel 2 setup
+    outb(PIT_CH2_GATE, inb(PIT_CH2_GATE) | 0x1);
+    outb(PIT_CMD, CMD_BINARY | CMD_MODE1 | CMD_RW_BOTH | CMD_COUNTER2);
+
+    int pit_divisor = PIT_FREQUENCY * CALLIBRATE_PERIOD / 1000;
+    outb(PIT_COUNTER2, pit_divisor);
+    outb(PIT_COUNTER2, pit_divisor >> 8);
+    
+    // ---- Measure start
+
+    // PIT gate low
+    outb(PIT_CH2_GATE, inb(PIT_CH2_GATE) & (~0x1));
+    // PIT gate high
+    outb(PIT_CH2_GATE, inb(PIT_CH2_GATE) | 0x1);
+    // PIT is counting now
+    // Reset APIC timer counter
+    lapic_write(APIC_TMRINITCNT, -1);
+    // Wait PIT counter to be zero
+    while (inb(PIT_CH2_GATE) & 0x20);
+    // Disable APIC timer
+    lapic_write(APIC_LVT_TMR, APIC_DISABLE);
+
+    // ---- Measure end
+
+    uint64_t cpu_bus_freq = (uint64_t)((uint32_t)(-1) - lapic_read(APIC_TMRCURRCNT)) * 1000 / CALLIBRATE_PERIOD;
+
+    // Final APIC timer setup using calculated CPU bus frequency
+    lapic_write(APIC_TMRINITCNT, cpu_bus_freq * APIC_TIMER_PERIOD / 1000);
+    lapic_write(APIC_TMRDIV, TMR_DIV_X1);
     lapic_write(APIC_LVT_TMR, IRQ_TIMER | TMR_PERIODIC);
-    // Init counter.
-    lapic_write(APIC_TMRINITCNT, 1000000000);
 }
 
 void apic_eoi()

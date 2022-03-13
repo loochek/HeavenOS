@@ -63,7 +63,7 @@ void kmain()
 
     irq_enable();
 
-    // *(volatile int*)(-10) = 0xDEAD;
+    //*(volatile int*)(-1) = 0xDEAD;
 
     panic("manually initiated %s", "panic");
 }
