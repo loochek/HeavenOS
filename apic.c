@@ -118,7 +118,7 @@ void apic_init()
         panic("ACPI MADT not found!");
 
     lapic_ptr = (volatile uint32_t*)(uint64_t)header->lapic_addr;
-
+    
     madt_entry_t* entry = &header->first_entry;
 
     for (;;)

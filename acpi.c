@@ -79,7 +79,7 @@ static void acpi_xsdt_init()
               sign);
     }
 
-    printk("Found valid ACPI XSDT at %p\n", rsdt);
+    printk("Found valid ACPI XSDT at %p\n", xsdt);
 }
 
 static void acpi_rsdp_check(acpi_rsdp_t *rsdp)
@@ -104,7 +104,7 @@ static bool acpi_check(acpi_sdt_t *acpi_table)
     kassert_dbg(acpi_table != NULL);
 
     uint32_t checksum = 0;
-    for (int i = 0; i < acpi_table->header.checksum; i++)
+    for (int i = 0; i < (int)acpi_table->header.length; i++)
         checksum += ((uint8_t*)acpi_table)[i];
 
     return (checksum & 0xFF) == 0;
