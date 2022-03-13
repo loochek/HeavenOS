@@ -10,6 +10,11 @@
 void apic_init();
 
 /**
+ * Initializes APIC timer
+ */
+void apic_setup_timer();
+
+/**
  * Signals end-of-interrupt to the APIC. 
  * Must be called before interrupt handler finishes.
  */

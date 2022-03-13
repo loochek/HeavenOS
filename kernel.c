@@ -56,11 +56,14 @@ void kmain()
     printk("HeavenOS version %s\n", HEAVENOS_VERSION);
     acpi_init();
     apic_init();
+    apic_setup_timer();
 
     dump_memmap();
     printk("\n\n\n\n");
 
-    //irq_enable();
+    irq_enable();
+
+    // *(volatile int*)(-10) = 0xDEAD;
 
     panic("manually initiated %s", "panic");
 }

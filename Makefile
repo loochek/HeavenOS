@@ -10,7 +10,11 @@ OBJCOPY=objcopy
 GRUB_MKRESCUE=grub-mkrescue
 
 QEMU=qemu-system-x86_64
-QEMUFLAGS=-cdrom kernel.iso -monitor stdio
+QEMU_FLAGS=-cdrom kernel.iso -monitor stdio
+
+ifdef EFI
+QEMU_FLAGS+=-bios /usr/share/OVMF/x64/OVMF.fd
+endif
 
 kernel.iso: kernel.bin
 	mkdir -p isodir/boot/grub
@@ -29,10 +33,10 @@ kernel.bin: boot.o common.o kernel.o multiboot.o fb.o console.o printk.o panic.o
 	$(LD) $(LD_FLAGS) -T linker.ld -o $@ $^
 
 qemu: kernel.iso
-	$(QEMU) $(QEMUFLAGS)
+	$(QEMU) $(QEMU_FLAGS)
 
 qemu-gdb: kernel.iso
-	$(QEMU) $(QEMUFLAGS) -s -S
+	$(QEMU) $(QEMU_FLAGS) -s -S
 
 clean:
 	rm -f *.o kernel.bin kernel.iso

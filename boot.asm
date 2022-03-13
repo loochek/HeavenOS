@@ -19,10 +19,15 @@ PTE_PS:  equ 0x080   ; Page Size
 PTE_G:   equ 0x100   ; Global
 PTE_NX:  equ 1 << 63 ; Not executable
 
-GDT_P: equ 1 << 15
-GDT_S: equ 1 << 12
-GDT_G: equ 1 << 23
-GDT_L: equ 1 << 21
+GDT_G:  equ 1 << 23
+GDT_L:  equ 1 << 21
+GDT_P:  equ 1 << 15
+GDT_S:  equ 1 << 12
+GDT_E:  equ 1 << 11
+GDT_RW: equ 1 << 9
+
+GDT_KERNEL_CODE64_SELECTOR: equ 0x8
+GDT_KERNEL_DATA64_SELECTOR: equ 0x10
 
 ; .multiboot section defines Multiboot 2 compatible header.
 section .multiboot
@@ -115,12 +120,20 @@ section .text
 
    ; Load new GDT.
         lgdt [gdt64_ptr]
-        jmp 0x8:.gdt_code_64
+        jmp GDT_KERNEL_CODE64_SELECTOR:.gdt_code_64
 
     .gdt_code_64:
    ; We we are now running 64-bit mode. Yay!
 
     bits 64
+   ; Setup segment registers
+        mov ax, GDT_KERNEL_DATA64_SELECTOR
+        mov ds, ax
+        mov ss, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
+
    ; Setup simple stack and call kernel_main.
         mov rsp, bootstack
         call kmain
@@ -139,10 +152,15 @@ section .data
         dd 0
         dd 0
 
-        ; 1: 64-bit code segment.
+        ; 1: 64-bit kernel code segment.
         dd 0xFFFF
         ; (0xF << 16) fills base 31:24.
-        dd GDT_G | GDT_L | GDT_P| GDT_S | (1 << 11) | (1 << 9) | (0xF << 16)
+        dd GDT_G | GDT_L | GDT_P | GDT_S | GDT_E | GDT_RW | (0xF << 16)
+
+        ; 2: 64-bit kernel data segment.
+        dd 0xFFFF
+        ; (0xF << 16) fills base 31:24.
+        dd GDT_G | GDT_L | GDT_P | GDT_S | GDT_RW | (0xF << 16)
 
     gdt64_ptr:
         dw $ - gdt64

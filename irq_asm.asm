@@ -1,25 +1,25 @@
 IDT_DESC_SIZE: equ 16
 KERNEL_CODE64: equ 8
 
-; params: vec entry selector flags
-%macro IDT_ENTRY 4
+; params: vec selector flags
+%macro IDT_ENTRY 3
     ; rbx = &IDT[vec]
     lea rbx, idt + %1 * IDT_DESC_SIZE
 
     ; first dword = (segment selector << 16) | (entry & 0xFFFF)
-    lea rax, _irq_entry_%2
+    lea rax, _irq_entry_%1
     and eax, 0xFFFF
-    or  eax, %3 << 16
+    or  eax, %2 << 16
     mov dword [rbx], eax
 
     ; second dword = (entry & 0xFFFF0000) | (flags << 8)
-    lea rax, _irq_entry_%2
+    lea rax, _irq_entry_%1
     and eax, 0xFFFF0000
-    or  eax, (%4 << 8)
+    or  eax, (%3 << 8)
     mov dword [rbx + 4], eax
 
     ; third dword = entry >> 32
-    lea rax, _irq_entry_%2
+    lea rax, _irq_entry_%1
     shr rax, 32
     mov dword [ebx + 8], eax
 
@@ -33,17 +33,19 @@ KERNEL_CODE64: equ 8
 %define GATE_INTERRUPT 0b10001110
 %define GATE_TRAP      0b10001111
 
-; params: errcode entry
+; params: vector errcode
 %macro IRQ_ENTRY 2
     section .text
-    extern %2
     align 16
 
-_irq_entry_%2:
-%if !%1
+_irq_entry_%1:
+%if !%2
     ; Push dummy error code
     push qword 0
 %endif
+
+    ; Push IRQ number
+    push qword %1
 
     ; First of all, save GPRs on stack.
     push rax
@@ -64,7 +66,7 @@ _irq_entry_%2:
 
     ; Pass pointer for struct irqctx* which is current stack top.
     mov rdi, rsp
-    call %2
+    call irq_handler
 
     pop r15
     pop r14
@@ -82,10 +84,8 @@ _irq_entry_%2:
     pop rbx
     pop rax
 
-%if %1
-    ; Skip error code.
-    add rsp, 8
-%endif
+    ; Skip error code and IRQ number.
+    add rsp, 16
 
     ; Return from interrupt.
     iretq
@@ -101,44 +101,38 @@ section .data
         dd idt
 
 section .text
-    extern ud_handler
-    extern df_handler
-    extern ts_handler
-    extern np_handler
-    extern ss_handler
-    extern gp_handler
-    extern pf_handler
-    extern spurious_handler
-    extern timer_handler
+    extern irq_handler
 
-
-    IRQ_ENTRY ERRCODE,   ud_handler
-    IRQ_ENTRY ERRCODE,   df_handler
-    IRQ_ENTRY ERRCODE,   ts_handler
-    IRQ_ENTRY ERRCODE,   np_handler
-    IRQ_ENTRY ERRCODE,   ss_handler
-    IRQ_ENTRY ERRCODE,   gp_handler
-    IRQ_ENTRY ERRCODE,   pf_handler
-    IRQ_ENTRY NOERRCODE, nm_handler
-    IRQ_ENTRY NOERRCODE, spurious_handler
-    IRQ_ENTRY NOERRCODE, timer_handler
+    ; Interrupt handlers
+    ;         Vec Errcode present
+    IRQ_ENTRY 6,  ERRCODE
+    IRQ_ENTRY 7,  NOERRCODE
+    IRQ_ENTRY 8,  ERRCODE
+    IRQ_ENTRY 10, ERRCODE
+    IRQ_ENTRY 11, ERRCODE
+    IRQ_ENTRY 12, ERRCODE
+    IRQ_ENTRY 13, ERRCODE
+    IRQ_ENTRY 14, ERRCODE
+    IRQ_ENTRY 32, NOERRCODE
+    IRQ_ENTRY 39, NOERRCODE
 
     global irq_init
     irq_init:
         push rbp
         mov rbp, rsp
         
-        ;         Vec   C handler          Selector       Flags
-        IDT_ENTRY 6,    ud_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 7,    nm_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 8,    df_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 10,   ts_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 11,   np_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 12,   ss_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 13,   gp_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 14,   pf_handler,        KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 32,   timer_handler,     KERNEL_CODE64, GATE_INTERRUPT
-        IDT_ENTRY 39,   spurious_handler,  KERNEL_CODE64, GATE_INTERRUPT
+        ; IDT entries
+        ;         Vec Selector       Flags
+        IDT_ENTRY 6,  KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 7,  KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 8,  KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 10, KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 11, KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 12, KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 13, KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 14, KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 32, KERNEL_CODE64, GATE_INTERRUPT
+        IDT_ENTRY 39, KERNEL_CODE64, GATE_INTERRUPT
 
         lidt [idt_ptr]
 

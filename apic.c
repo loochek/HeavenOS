@@ -1,5 +1,6 @@
 #include "apic.h"
 #include "panic.h"
+#include "irq.h"
 
 #define TYPE_LAPIC          0
 #define TYPE_IOAPIC         1
@@ -9,42 +10,6 @@
 
 #define FLAGS_ACTIVE_LOW      2
 #define FLAGS_LEVEL_TRIGGERED 8
-
-typedef struct ioapic
-{
-    uint32_t reg;
-    uint32_t pad[3];
-    uint32_t data;
-} ioapic_t;
-
-volatile uint32_t* lapic_ptr = NULL;
-volatile struct ioapic* ioapic_ptr = NULL;
-
-typedef struct __attribute__((packed)) madt_entry
-{
-    uint8_t type;
-    uint8_t length;
-    uint8_t data[0];
-} madt_entry_t;
-
-typedef struct __attribute__((packed)) madt_header
-{
-    acpi_sdt_header_t acpi;
-    uint32_t lapic_addr;
-    uint32_t flags;
-    madt_entry_t first_entry;
-} madt_header_t;
-
-static void lapic_write(size_t idx, uint32_t value)
-{
-    lapic_ptr[idx / 4] = value;
-    lapic_ptr[0];
-}
-
-// static uint32_t lapic_read(size_t idx)
-// {
-//     return lapic_ptr[idx / 4];
-// }
 
 #define APIC_ID          0x20
 #define APIC_VER         0x30
@@ -76,12 +41,47 @@ static void lapic_write(size_t idx, uint32_t value)
 #define TMR_PERIODIC     0x20000
 #define TMR_BASEDIV      (1<<20)
 
+#define IOAPIC_REG_TABLE  0x10
+
+typedef struct ioapic
+{
+    uint32_t reg;
+    uint32_t pad[3];
+    uint32_t data;
+} ioapic_t;
+
+typedef struct __attribute__((packed)) madt_entry
+{
+    uint8_t type;
+    uint8_t length;
+    uint8_t data[0];
+} madt_entry_t;
+
+typedef struct __attribute__((packed)) madt_header
+{
+    acpi_sdt_header_t acpi;
+    uint32_t lapic_addr;
+    uint32_t flags;
+    madt_entry_t first_entry;
+} madt_header_t;
+
+volatile uint32_t* lapic_ptr = NULL;
+volatile ioapic_t* ioapic_ptr = NULL;
+
 static inline void outb(uint16_t port, uint8_t data)
 {
     asm volatile("out %0,%1" : : "a" (data), "d" (port));
 }
 
-#define IOAPIC_REG_TABLE  0x10
+static void lapic_write(size_t idx, uint32_t value)
+{
+    lapic_ptr[idx / 4] = value;
+}
+
+// static uint32_t lapic_read(size_t idx)
+// {
+//     return lapic_ptr[idx / 4];
+// }
 
 // static void ioapic_write(int reg, uint32_t data)
 // {
@@ -95,7 +95,8 @@ static inline void outb(uint16_t port, uint8_t data)
 //     ioapic_write(IOAPIC_REG_TABLE + 2 * irq + 1, 0);
 // }
 
-void apic_init() {
+void apic_init()
+{
     // Find Multiple APIC Description Table, it contains addresses of I/O APIC and LAPIC.
     madt_header_t* header = (madt_header_t*)acpi_lookup("APIC");
     if (!header)
@@ -124,17 +125,17 @@ void apic_init() {
     }
 
     if (!ioapic_ptr)
-        panic("cannot locate I/O APIC address");
+        panic("Cannot locate I/O APIC address");
 
     if (!lapic_ptr)
-        panic("cannot locate Local APIC address");
+        panic("Cannot locate Local APIC address");
 
     // Disable old PIC.
     outb(0x20 + 1, 0xFF);
     outb(0xA0 + 1, 0xFF);
 
     // Enable APIC, by setting spurious interrupt vector and APIC Software Enabled/Disabled flag.
-    lapic_write(APIC_SPURIOUS, 39 | APIC_SW_ENABLE);
+    lapic_write(APIC_SPURIOUS, IRQ_SPURIOUS | APIC_SW_ENABLE);
 
     // Disable performance monitoring counters.
     lapic_write(APIC_LVT_PERF, APIC_DISABLE);
@@ -148,18 +149,22 @@ void apic_init() {
 
     // Set highest priority for current task.
     lapic_write(APIC_TASKPRIOR, 0);
+}
 
+void apic_setup_timer()
+{
     // TODO: calibrate APIC timer to fire interrupt every millisecond.
 
     // APIC timer setup.
     // Divide Configuration Registers, set to X1
     lapic_write(APIC_TMRDIV, 0xB);
     // Interrupt vector and timer mode.
-    lapic_write(APIC_LVT_TMR, 32 | TMR_PERIODIC);
+    lapic_write(APIC_LVT_TMR, IRQ_TIMER | TMR_PERIODIC);
     // Init counter.
-    lapic_write(APIC_TMRINITCNT, 10000000);
+    lapic_write(APIC_TMRINITCNT, 1000000000);
 }
 
-void apic_eoi() {
+void apic_eoi()
+{
     lapic_write(APIC_EOI, 0);
 }
