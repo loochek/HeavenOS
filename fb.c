@@ -90,7 +90,7 @@ void fb_scroll_up(int height, fb_color_t color)
 {
     kassert(fb_initialized);
 
-    memmove(fb_addr, fb_addr + fb_pitch * height, fb_pitch * (fb_height - height) * sizeof(fb_color_t));
+    memmove(fb_addr, fb_addr + fb_pitch * height, fb_pitch * (fb_height - height));
     for (int y = fb_height - height; y < fb_height; y++)
         fb_put_rect_fragment(color, 0, y, fb_width);
 }
