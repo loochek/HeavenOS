@@ -54,14 +54,16 @@
 #define IOAPIC_REG_TABLE  0x10
 
 // PIT
-#define CMD_BINARY    0x00 // Use Binary counter values
-#define PIT_COUNTER2  0x42
-#define PIT_CMD       0x43
-#define PIT_CH2_GATE  0x61
-#define CMD_MODE1     0x02 // Hardware Retriggerable One-Shot
-#define CMD_RW_BOTH   0x30 // Least followed by Most Significant Byte
-#define CMD_COUNTER2  0x80
-#define PIT_FREQUENCY 1193182
+#define CMD_BINARY     0x00 // Use Binary counter values
+#define PIT_COUNTER2   0x42
+#define PIT_CMD        0x43
+#define PIT_GATE       0x61
+#define CMD_MODE1      0x02 // Hardware Retriggerable One-Shot
+#define CMD_RW_BOTH    0x30 // Least followed by Most Significant Byte
+#define CMD_COUNTER2   0x80
+#define CMD_GATE_WRITE 0x01
+#define CMD_GATE_READ  0x20
+#define PIT_FREQUENCY  1193182
 
 typedef struct ioapic
 {
@@ -174,7 +176,6 @@ void apic_setup_timer()
 
     // Using PIT to callibrate APIC timer
     // PIT Channel 2 setup
-    outb(PIT_CH2_GATE, inb(PIT_CH2_GATE) | 0x1);
     outb(PIT_CMD, CMD_BINARY | CMD_MODE1 | CMD_RW_BOTH | CMD_COUNTER2);
 
     int pit_divisor = PIT_FREQUENCY * CALLIBRATE_PERIOD / 1000;
@@ -184,14 +185,14 @@ void apic_setup_timer()
     // ---- Measure start
 
     // PIT gate low
-    outb(PIT_CH2_GATE, inb(PIT_CH2_GATE) & (~0x1));
+    outb(PIT_GATE, inb(PIT_GATE) & (~CMD_GATE_WRITE));
     // PIT gate high
-    outb(PIT_CH2_GATE, inb(PIT_CH2_GATE) | 0x1);
+    outb(PIT_GATE, inb(PIT_GATE) | CMD_GATE_WRITE);
     // PIT is counting now
     // Reset APIC timer counter
     lapic_write(APIC_TMRINITCNT, -1);
-    // Wait PIT counter to be zero
-    while (inb(PIT_CH2_GATE) & 0x20);
+    // Wait PIT gate to be high
+    while (inb(PIT_GATE) & CMD_GATE_READ);
     // Disable APIC timer
     lapic_write(APIC_LVT_TMR, APIC_DISABLE);
 
