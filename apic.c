@@ -61,8 +61,8 @@
 #define CMD_MODE1      0x02 // Hardware Retriggerable One-Shot
 #define CMD_RW_BOTH    0x30 // Least followed by Most Significant Byte
 #define CMD_COUNTER2   0x80
-#define CMD_GATE_WRITE 0x01
-#define CMD_GATE_READ  0x20
+#define CMD_CH2_IN     0x01
+#define CMD_CH2_OUT    0x20
 #define PIT_FREQUENCY  1193182
 
 typedef struct ioapic
@@ -185,14 +185,14 @@ void apic_setup_timer()
     // ---- Measure start
 
     // PIT gate low
-    outb(PIT_GATE, inb(PIT_GATE) & (~CMD_GATE_WRITE));
+    outb(PIT_GATE, inb(PIT_GATE) & (~CMD_CH2_IN));
     // PIT gate high
-    outb(PIT_GATE, inb(PIT_GATE) | CMD_GATE_WRITE);
+    outb(PIT_GATE, inb(PIT_GATE) | CMD_CH2_IN);
     // PIT is counting now
     // Reset APIC timer counter
     lapic_write(APIC_TMRINITCNT, -1);
     // Wait PIT gate to be high
-    while (inb(PIT_GATE) & CMD_GATE_READ);
+    while (!(inb(PIT_GATE) & CMD_CH2_OUT));
     // Disable APIC timer
     lapic_write(APIC_LVT_TMR, APIC_DISABLE);
 
