@@ -98,7 +98,7 @@ section .bss
 section .data
     idt_ptr:
         dw 4 * 256
-        dd idt
+        dq idt
 
 section .text
     extern irq_handler

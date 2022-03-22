@@ -164,7 +164,7 @@ section .data
 
     gdt64_ptr:
         dw $ - gdt64
-        dd gdt64
+        dq gdt64
 
     ; Multiboot boot info pointer
     global mb_boot_info
