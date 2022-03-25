@@ -1,10 +1,10 @@
 AS=nasm
-CC=gcc
-LD=gcc
+CC=x86_64-elf-gcc
+LD=x86_64-elf-gcc
 
 AS_FLAGS=-f elf64 -g -F dwarf
 CC_FLAGS=-mno-mmx -mno-sse -mno-sse2 -fno-pie -g -mno-red-zone -std=gnu99 -ffreestanding -nostdlib -O2 -Wall -Wextra -Werror -fno-stack-protector
-LD_FLAGS=-ffreestanding -O0 -no-pie -nostdlib -fno-stack-protector
+LD_FLAGS=-ffreestanding -O2 -no-pie -nostdlib -fno-stack-protector
 
 OBJCOPY=objcopy
 GRUB_MKRESCUE=grub-mkrescue
@@ -34,7 +34,7 @@ kernel.iso: kernel.bin
 	$(AS) $(AS_FLAGS) -o $@ $<
 
 kernel.bin: boot.o common.o kernel.o multiboot.o fb.o console.o printk.o panic.o acpi.o apic.o irq.o irq_asm.o
-	$(LD) $(LD_FLAGS) -T linker.ld -o $@ $^
+	$(LD) $(LD_FLAGS) -T linker.ld -z max-page-size=4096 -o $@ $^
 
 qemu: kernel.iso
 	$(QEMU) $(QEMU_FLAGS)
