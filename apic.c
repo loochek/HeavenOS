@@ -192,7 +192,11 @@ void apic_setup_timer()
     // Reset APIC timer counter
     lapic_write(APIC_TMRINITCNT, -1);
     // Wait PIT gate to be high
+#ifndef QEMU_PIT_HACK
     while (!(inb(PIT_GATE) & CMD_CH2_OUT));
+#else
+    while (inb(PIT_GATE) & CMD_CH2_OUT);
+#endif
     // Disable APIC timer
     lapic_write(APIC_LVT_TMR, APIC_DISABLE);
 

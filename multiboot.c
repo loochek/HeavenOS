@@ -2,13 +2,13 @@
 #include "panic.h"
 #include "multiboot.h"
 
-const int MB_TAG_ALIGNMENT = 8;
+#define MB_TAG_ALIGNMENT 8
 
-const uint32_t MB_TAG_END     = 0;
-const uint32_t MB_TAG_MEMMAP  = 6;
-const uint32_t MB_TAG_FB      = 8;
-const uint32_t MB_TAG_RSDP_V1 = 14;
-const uint32_t MB_TAG_RSDP_V2 = 15;
+#define MB_TAG_END     0
+#define MB_TAG_MEMMAP  6
+#define MB_TAG_FB      8
+#define MB_TAG_RSDP_V1 14
+#define MB_TAG_RSDP_V2 15
 
 // To be filled by entry point code
 extern uint8_t *mb_boot_info;

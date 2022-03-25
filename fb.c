@@ -16,7 +16,7 @@ static void fb_put_rect_fragment(fb_color_t color, int x, int y, int width);
 
 void fb_init()
 {
-    kassert(mb_fb_info != NULL && mb_fb_info->type == 1 || mb_fb_info->depth == 32);
+    kassert(mb_fb_info != NULL && mb_fb_info->type == 1 && mb_fb_info->depth == 32);
 
     fb_width  = mb_fb_info->width;
     fb_height = mb_fb_info->heigth;

@@ -1,16 +1,20 @@
 AS=nasm
-CC=clang
-LD=clang
+CC=gcc
+LD=gcc
 
 AS_FLAGS=-f elf64 -g -F dwarf
-CC_FLAGS=-mno-mmx -mno-sse -mno-sse2 -fno-pie -g -mno-red-zone -std=gnu99 -ffreestanding -nostdlib -O2 -Wall -Wextra -Werror -Wnewline-eof -fno-stack-protector
+CC_FLAGS=-mno-mmx -mno-sse -mno-sse2 -fno-pie -g -mno-red-zone -std=gnu99 -ffreestanding -nostdlib -O2 -Wall -Wextra -Werror -fno-stack-protector
 LD_FLAGS=-ffreestanding -O0 -no-pie -nostdlib -fno-stack-protector
 
 OBJCOPY=objcopy
 GRUB_MKRESCUE=grub-mkrescue
 
 QEMU=qemu-system-x86_64
-QEMU_FLAGS=-cdrom kernel.iso -monitor stdio
+QEMU_FLAGS=-cdrom kernel.iso -monitor stdio -accel kvm
+
+ifndef RELEASE
+CC_FLAGS+=-DQEMU_PIT_HACK
+endif
 
 ifdef EFI
 QEMU_FLAGS+=-bios /usr/share/OVMF/x64/OVMF.fd
