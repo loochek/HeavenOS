@@ -1,7 +1,7 @@
-#include "apic.h"
-#include "panic.h"
-#include "irq.h"
-#include "x86.h"
+#include "drivers/apic.h"
+#include "kernel/panic.h"
+#include "kernel/irq.h"
+#include "arch/x86.h"
 
 // APIC timer period in milliseconds
 #define APIC_TIMER_PERIOD 1

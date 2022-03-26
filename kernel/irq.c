@@ -1,7 +1,7 @@
-#include "irq.h"
-#include "panic.h"
-#include "x86.h"
-#include "apic.h"
+#include "kernel/irq.h"
+#include "kernel/panic.h"
+#include "arch/x86.h"
+#include "drivers/apic.h"
 
 static const char *exc_names[] =
 {

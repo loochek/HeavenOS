@@ -1,5 +1,5 @@
-#include "panic.h"
-#include "console.h"
+#include "kernel/panic.h"
+#include "kernel/console.h"
 
 static const int FONT_WIDTH  = 8;
 static const int FONT_HEIGHT = 8;

@@ -1,5 +1,6 @@
 target remote :1234
-symbol-file kernel.bin
-b _start
+file kernel.bin
+symbol-file kernel.sym
+b kmain
 c
 layout src

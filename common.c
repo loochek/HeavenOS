@@ -49,21 +49,21 @@ void memmove(void *dst, const void *src, size_t n)
         s += n;
         d += n;
         if (!(((intptr_t)s & 7) | ((intptr_t)d & 7) | (n & 7))) {
-            asm volatile("std; rep movsq\n" ::"D"(d - 8), "S"(s - 8), "c"(n / 8)
+            __asm__ volatile("std; rep movsq\n" ::"D"(d - 8), "S"(s - 8), "c"(n / 8)
                          : "cc", "memory");
         } else {
-            asm volatile("std; rep movsb\n" ::"D"(d - 1), "S"(s - 1), "c"(n)
+            __asm__ volatile("std; rep movsb\n" ::"D"(d - 1), "S"(s - 1), "c"(n)
                          : "cc", "memory");
         }
         /* Some versions of GCC rely on DF being clear */
-        asm volatile("cld" ::
+        __asm__ volatile("cld" ::
                              : "cc");
     } else {
         if (!(((intptr_t)s & 7) | ((intptr_t)d & 7) | (n & 7))) {
-            asm volatile("cld; rep movsq\n" ::"D"(d), "S"(s), "c"(n / 8)
+            __asm__ volatile("cld; rep movsq\n" ::"D"(d), "S"(s), "c"(n / 8)
                          : "cc", "memory");
         } else {
-            asm volatile("cld; rep movsb\n" ::"D"(d), "S"(s), "c"(n)
+            __asm__ volatile("cld; rep movsb\n" ::"D"(d), "S"(s), "c"(n)
                          : "cc", "memory");
         }
     }

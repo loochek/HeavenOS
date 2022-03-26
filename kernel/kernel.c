@@ -1,11 +1,13 @@
-#include "multiboot.h"
-#include "fb.h"
-#include "console.h"
-#include "printk.h"
-#include "panic.h"
-#include "acpi.h"
-#include "apic.h"
-#include "irq.h"
+#include "boot/early.h"
+#include "kernel/multiboot.h"
+#include "kernel/console.h"
+#include "kernel/printk.h"
+#include "kernel/panic.h"
+#include "kernel/irq.h"
+#include "drivers/fb.h"
+#include "drivers/acpi.h"
+#include "drivers/apic.h"
+#include "mm/paging.h"
 
 void dump_memmap()
 {
@@ -46,22 +48,32 @@ void dump_memmap()
     }
 }
 
-void kmain()
+extern pml4_t early_pml4;
+
+void unmap_early()
 {
-    irq_init();
-    mb_parse_boot_info();
+    pml4_t *pml4_virt = PHYS_TO_VIRT(&early_pml4);
+    pdpt_t *pdpd_virt = PHYS_TO_VIRT((pml4_virt->entries[0] & (~0xFFF)) >> 12);
+    pdpd_virt->entries[0] = 0;
+}
+
+void kmain(early_data_t *early_data)
+{
+    unmap_early();
+    // irq_init();
+    mb_parse_boot_info(early_data);
     fb_init(mb_fb_info);
     cons_init();
 
     printk("HeavenOS version %s\n", HEAVENOS_VERSION);
     acpi_init();
-    apic_init();
-    apic_setup_timer();
+    // apic_init();
+    // apic_setup_timer();
 
     dump_memmap();
     printk("\n\n\n\n");
 
-    irq_enable();
+    // irq_enable();
 
     //*(volatile int*)(-1) = 0xDEAD;
 

@@ -1,6 +1,6 @@
-#include "acpi.h"
-#include "panic.h"
-#include "multiboot.h"
+#include "drivers/acpi.h"
+#include "kernel/panic.h"
+#include "kernel/multiboot.h"
 
 static acpi_rsdt_t *rsdt = NULL;
 static acpi_xsdt_t *xsdt = NULL;

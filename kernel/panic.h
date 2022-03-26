@@ -1,7 +1,7 @@
 #ifndef PANIC_H
 #define PANIC_H
 
-#include "printk.h"
+#include "kernel/printk.h"
 
 #define __S1(x) #x
 #define __S2(x) __S1(x)

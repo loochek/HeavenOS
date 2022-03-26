@@ -1,7 +1,7 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
-#include "fb.h"
+#include "drivers/fb.h"
 
 extern bool cons_initialized;
 

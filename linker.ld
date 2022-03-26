@@ -1,39 +1,62 @@
-ENTRY(_start)
+ENTRY(_early_entry_point)
+
+#include "mm/mem_layout.h"
 
 SECTIONS
 {
-	. = 2M;
+    // https://stackoverflow.com/questions/15400910/ld-linker-script-producing-huge-binary
+    . = SIZEOF_HEADERS;
 
-    .multiboot : {
+    .multiboot : ALIGN(4) {
         KEEP(*(.multiboot))
     }
 
-    .boot.text : {
-        *(.boot.text)
+    . = 2M;
+
+    PROVIDE(_phys_start_kernel_sections = .);
+    .early.text : {
+        *(.early.text)
     }
 
-    .boot.bss : {
-        *(.boot.bss)
+    .early.rodata : {
+        *(.early.rodata)
     }
 
-	.text BLOCK(4K) : ALIGN(4K)
-	{
-		*(.text)
-	}
+    .early.data : {
+        *(.early.data)
+    }
 
-	.rodata BLOCK(4K) : ALIGN(4K)
-	{
-		*(.rodata)
-	}
+    .early.bss : {
+        *(.early.bss)
+    }
 
-	.data BLOCK(4K) : ALIGN(4K)
-	{
-		*(.data)
-	}
+    . = ALIGN(0x200000);
+    _end_early = .;
 
-	.bss BLOCK(4K) : ALIGN(4K)
-	{
-		*(COMMON)
-		*(.bss)
-	}
+    . = KERNEL_SECTIONS_START;
+    _phys_start_hh = _end_early + . - KERNEL_SECTIONS_START;
+    .text : AT(_end_early + ADDR(.text) - KERNEL_SECTIONS_START) {
+        *(.text)
+    }
+
+    .rodata : AT(_end_early + ADDR(.rodata) - KERNEL_SECTIONS_START) {
+        *(.rodata)
+    }
+
+    .data : AT(_end_early + ADDR(.data) - KERNEL_SECTIONS_START) {
+        *(.data)
+    }
+
+    .bss : AT(_end_early + ADDR(.bss) - KERNEL_SECTIONS_START) {
+        *(COMMON)
+        *(.bss)
+    }
+    . = ALIGN(0x200000);
+    PROVIDE(_phys_end_kernel_sections = _end_early + . - KERNEL_SECTIONS_START);
+
+    /DISCARD/ : {
+        *(.eh_frame)
+        *(.note.gnu.*)
+        *(.dynamic)
+    }
 }
