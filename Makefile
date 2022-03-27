@@ -7,7 +7,7 @@ OBJCOPY=x86_64-elf-objcopy
 GRUB_MKRESCUE=grub-mkrescue
 
 ROOT=$(shell pwd)
-ASFLAGS=-f elf64 -g -F dwarf
+ASFLAGS=-f elf64 -F dwarf -g
 CCFLAGS=-I$(ROOT) -mno-mmx -mno-sse -mno-sse2 -maddress-mode=long -mcmodel=kernel -g -m64 -mno-red-zone -ffreestanding -fno-common -Wall -Wextra -Werror -nostdlib
 LDFLAGS=-nostdlib --no-dynamic-linker --warn-constructors --warn-common --no-eh-frame-hdr
 
@@ -18,7 +18,7 @@ endif
 export
 
 QEMU=qemu-system-x86_64
-QEMUFLAGS=-cdrom kernel.iso -monitor stdio -accel kvm
+QEMUFLAGS=-cdrom kernel.iso -monitor stdio
 
 ifdef EFI
 QEMUFLAGS+=-bios /usr/share/OVMF/x64/OVMF.fd
@@ -36,7 +36,7 @@ kernel.bin:
 	$(MAKE) -C drivers/
 	$(MAKE) -C kernel/
 	$(MAKE) -C mm/
-	$(LD) $(LDFLAGS) -T <(cpp -P -E linker.ld) `find $(ROOT) -name '*.o'` -o kernel.bin
+	$(LD) $(LDFLAGS) -T <(cpp -P -E linker.ld) -z max-page-size=4096 `find $(ROOT) -name '*.o'` -o kernel.bin
 	$(OBJCOPY) --only-keep-debug kernel.bin kernel.sym
 	$(OBJCOPY) --strip-debug kernel.bin
 

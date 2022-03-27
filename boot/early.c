@@ -45,11 +45,11 @@ static EARLY_TEXT void early_setup_paging()
 
         for (size_t j = 0; j < 512; j++)
         {
-            direct_phys_mapping_pdpts[i].entries[j] = phys_addr | PTE_PAGE_SIZE | PTE_PRESENT;
+            direct_phys_mapping_pdpts[i].entries[j] = phys_addr | PTE_PAGE_SIZE | PTE_PRESENT | PTE_WRITEABLE;
             phys_addr += GB;
         }
 
-        uint64_t pml4e = ((uint64_t)&direct_phys_mapping_pdpts[i]) | PTE_PRESENT;
+        uint64_t pml4e = ((uint64_t)&direct_phys_mapping_pdpts[i]) | PTE_PRESENT | PTE_WRITEABLE;
         early_pml4.entries[PML4E_FROM_ADDR(virt_addr)] = pml4e;
     }
 
@@ -61,13 +61,13 @@ static EARLY_TEXT void early_setup_paging()
     while (phys_addr_curr < phys_addr_end)
     {
         size_t pgdir_idx = PDPE_FROM_ADDR(virt_addr_curr) - PDPE_FROM_ADDR(virt_addr_start);
-        higher_half_pgdirs[pgdir_idx].entries[PDE_FROM_ADDR(virt_addr_curr)] = phys_addr_curr | PTE_PAGE_SIZE | PTE_PRESENT;
+        higher_half_pgdirs[pgdir_idx].entries[PDE_FROM_ADDR(virt_addr_curr)] = phys_addr_curr | PTE_PAGE_SIZE | PTE_PRESENT | PTE_WRITEABLE;
         phys_addr_curr += 2 * MB;
         virt_addr_curr += 2 * MB;
-        higher_half_pdpt.entries[PDPE_FROM_ADDR(virt_addr_curr)] = ((uint64_t)&higher_half_pgdirs[pgdir_idx]) | PTE_PRESENT;
+        higher_half_pdpt.entries[PDPE_FROM_ADDR(virt_addr_curr)] = ((uint64_t)&higher_half_pgdirs[pgdir_idx]) | PTE_PRESENT | PTE_WRITEABLE;
     }
 
-    early_pml4.entries[PML4E_FROM_ADDR(virt_addr_curr)] = ((uint64_t)&higher_half_pdpt) | PTE_PRESENT;
+    early_pml4.entries[PML4E_FROM_ADDR(virt_addr_curr)] = ((uint64_t)&higher_half_pdpt) | PTE_PRESENT | PTE_WRITEABLE;
 }
 
 extern void jump_to_kernel_main();

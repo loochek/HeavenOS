@@ -21,10 +21,10 @@ KERNEL_CODE64: equ 8
     ; third dword = entry >> 32
     lea rax, _irq_entry_%1
     shr rax, 32
-    mov dword [ebx + 8], eax
+    mov dword [rbx + 8], eax
 
     ; fourth dword = reserved
-    mov dword [ebx + 16], 0
+    mov dword [rbx + 16], 0
 %endmacro
 
 %define ERRCODE 1

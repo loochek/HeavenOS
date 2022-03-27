@@ -1,6 +1,7 @@
 #include "drivers/acpi.h"
 #include "kernel/panic.h"
 #include "kernel/multiboot.h"
+#include "mm/paging.h"
 
 static acpi_rsdt_t *rsdt = NULL;
 static acpi_xsdt_t *xsdt = NULL;
@@ -35,7 +36,7 @@ static void acpi_rsdt_init()
     acpi_rsdp_t *rsdp = (acpi_rsdp_t*)mb_acpi_rsdp_v1->rsdp;
     acpi_rsdp_check(rsdp);
 
-    rsdt = (acpi_rsdt_t*)(uint64_t)rsdp->rsdt_address;
+    rsdt = (acpi_rsdt_t*)PHYS_TO_VIRT((uint64_t)rsdp->rsdt_address);
     if (!acpi_check((acpi_sdt_t*)rsdt))
     {
         char sign[sizeof(rsdt->header.signature) + 1] = {0};
@@ -69,7 +70,7 @@ static void acpi_xsdt_init()
               sign);
     }
 
-    xsdt = (acpi_xsdt_t*)(uint64_t)rsdp->xsdt_address;
+    xsdt = (acpi_xsdt_t*)PHYS_TO_VIRT((uint64_t)rsdp->xsdt_address);
     if (!acpi_check((acpi_sdt_t*)xsdt))
     {
         char sign[sizeof(xsdt->header.signature) + 1] = {0};
@@ -115,11 +116,11 @@ static acpi_sdt_t* acpi_rsdt_lookup(const char* signature)
     size_t size = (rsdt->header.length - sizeof(rsdt->header)) / sizeof(uint32_t);
     for (size_t i = 0; i < size; i++)
     {
-        acpi_sdt_t* sdt = (acpi_sdt_t*)(uint64_t)rsdt->entries[i];
+        acpi_sdt_t* sdt = (acpi_sdt_t*)PHYS_TO_VIRT(rsdt->entries[i]);
         if (memcmp(signature, &sdt->header.signature, sizeof(sdt->header.signature)) == 0)
         {
             // Do checksum check
-            return acpi_check((acpi_sdt_t*)rsdt) ? sdt : NULL;
+            return acpi_check(sdt) ? sdt : NULL;
         }
     }
 
@@ -131,11 +132,11 @@ static acpi_sdt_t* acpi_xsdt_lookup(const char* signature)
     size_t size = (xsdt->header.length - sizeof(xsdt->header)) / sizeof(uint64_t);
     for (size_t i = 0; i < size; i++)
     {
-        acpi_sdt_t* sdt = (acpi_sdt_t*)xsdt->entries[i];
+        acpi_sdt_t* sdt = (acpi_sdt_t*)PHYS_TO_VIRT(xsdt->entries[i]);
         if (memcmp(signature, &sdt->header.signature, sizeof(sdt->header.signature)) == 0)
         {
             // Do checksum check
-            return acpi_check((acpi_sdt_t*)xsdt) ? sdt : NULL;
+            return acpi_check(sdt) ? sdt : NULL;
         }
     }
 

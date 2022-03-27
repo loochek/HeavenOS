@@ -4,8 +4,9 @@
 #include "common.h"
 #include "mm/mem_layout.h"
 
-#define PTE_PAGE_SIZE (1ull << 7)
 #define PTE_PRESENT   (1ull << 0)
+#define PTE_WRITEABLE (1ull << 1)
+#define PTE_PAGE_SIZE (1ull << 7)
 
 #define PTE_FLAGS_MASK ((1ull << 12) - 1)
 #define PTE_ADDR_MASK  ((1ull << 48) - 1)

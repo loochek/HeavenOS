@@ -2,6 +2,7 @@
 #include "kernel/panic.h"
 #include "kernel/irq.h"
 #include "arch/x86.h"
+#include "mm/paging.h"
 
 // APIC timer period in milliseconds
 #define APIC_TIMER_PERIOD 1
@@ -119,7 +120,7 @@ void apic_init()
     if (!header)
         panic("ACPI MADT not found!");
 
-    lapic_ptr = (volatile uint32_t*)(uint64_t)header->lapic_addr;
+    lapic_ptr = (volatile uint32_t*)PHYS_TO_VIRT(header->lapic_addr);
     
     madt_entry_t* entry = &header->first_entry;
 
