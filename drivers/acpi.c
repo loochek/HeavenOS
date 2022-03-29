@@ -23,10 +23,13 @@ void acpi_init()
 
 acpi_sdt_t* acpi_lookup(const char* signature)
 {
-    if (mb_acpi_rsdp_v2 != NULL)
+    if (xsdt != NULL)
         return acpi_xsdt_lookup(signature);
-    else
+    else if (rsdt != NULL)
         return acpi_rsdt_lookup(signature);
+
+    panic("Neither XSDT nor RSDT pointers were set");
+    return NULL;
 }
 
 static void acpi_rsdt_init()

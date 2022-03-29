@@ -23,6 +23,8 @@ GDT_RW: equ 1 << 9
 GDT_KERNEL_CODE64_SELECTOR: equ 0x8
 GDT_KERNEL_DATA64_SELECTOR: equ 0x10
 
+PAGE_SIZE: equ 4096
+
 ; Kernel entry point code
 section .early.text
     ; C code entry point
@@ -158,7 +160,9 @@ section .early.data
 section .early.bss
     global early_pml4
 
-    align 4096
-    early_pml4:  resb 4096
-    early_pdpt:  resb 4096
-    early_stack: resb 4096
+    align PAGE_SIZE
+    early_pml4:  resb PAGE_SIZE
+    early_pdpt:  resb PAGE_SIZE
+     
+    resb PAGE_SIZE * 4
+    early_stack:
