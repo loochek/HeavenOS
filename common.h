@@ -30,6 +30,8 @@
 #define ALIGN_UP(X, R) ((((uint64_t)X) + (R) - 1) / (R) * (R))
 #define DIV_ROUNDUP(X, R) ((((uint64_t)X) + (R) - 1) / (R))
 
+#define FLIP_BIT(val, bit) ((val) ^ (1 << (bit)))
+
 static inline int memcmp(const void* str1, const void* str2, size_t count)
 {
     const uint8_t *s1 = (const uint8_t*)str1;

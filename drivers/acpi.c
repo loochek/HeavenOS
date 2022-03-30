@@ -23,6 +23,8 @@ void acpi_init()
 
 acpi_sdt_t* acpi_lookup(const char* signature)
 {
+    kassert_dbg(signature != NULL);
+
     if (xsdt != NULL)
         return acpi_xsdt_lookup(signature);
     else if (rsdt != NULL)
@@ -88,6 +90,8 @@ static void acpi_xsdt_init()
 
 static void acpi_rsdp_check(acpi_rsdp_t *rsdp)
 {
+    kassert(rsdp != NULL);
+    
     // RSDP 1.0 checksum check
     uint32_t checksum = 0;
     for (int i = 0; i < (int)offsetof(acpi_rsdp_t, length); i++)

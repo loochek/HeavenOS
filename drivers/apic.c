@@ -171,6 +171,8 @@ void apic_init()
 
 void apic_setup_timer()
 {
+    kassert(lapic_ptr != NULL);
+    
     // Setup APIC timer for callibration
     lapic_write(APIC_LVT_TMR, IRQ_TIMER);
     lapic_write(APIC_TMRDIV, TMR_DIV_X1);
