@@ -30,7 +30,16 @@
 #define ALIGN_UP(X, R) ((((uint64_t)X) + (R) - 1) / (R) * (R))
 #define DIV_ROUNDUP(X, R) ((((uint64_t)X) + (R) - 1) / (R))
 
+#define GET_BIT(val, bit) (((val) >> (bit)) & 1)
+#define SET_BIT(val, bit) ((val) | (1 << (bit)))
+#define CLEAR_BIT(val, bit) ((val) & (~(1 << (bit))))
 #define FLIP_BIT(val, bit) ((val) ^ (1 << (bit)))
+
+typedef struct mem_region
+{
+    void* start;
+    void* end;
+} mem_region_t;
 
 static inline int memcmp(const void* str1, const void* str2, size_t count)
 {

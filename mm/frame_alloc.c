@@ -62,14 +62,14 @@ static list_node_t *list_pop(list_node_t *head)
     return ret;
 }
 
-static void zone_add(uint64_t addr, size_t pages_count)
+static size_t zone_add(uint64_t addr, size_t pages_count)
 {
-    kassert((addr & (PAGE_SIZE - 1)) == addr);
+    kassert((addr & (~(PAGE_SIZE - 1))) == addr);
     kassert(pages_count > (1 << MAX_ORDER));
     kassert(zones_count < MAX_ZONE_COUNT);
 
     allocator_zone_t *zone = &allocator_zones[zones_count++];
-    zone->start_addr = (void*)PHYS_TO_VIRT(addr);
+    zone->start_addr = (void*)addr;
 
     // 1. Determine max possible bitmap size and reserve space for it
 
@@ -80,7 +80,7 @@ static void zone_add(uint64_t addr, size_t pages_count)
 
     // In pages
     size_t bitmap_size = DIV_ROUNDUP(required_bitmap_size, PAGE_SIZE);
-    uint64_t bitmap_ptr = zone->start_addr;
+    uint64_t bitmap_ptr = (uint64_t)zone->start_addr;
     zone->start_addr += PAGE_SIZE * bitmap_size;
     pages_count -= bitmap_size;
 
@@ -106,26 +106,33 @@ static void zone_add(uint64_t addr, size_t pages_count)
     zone->orders[MAX_ORDER].bitmap = NULL;
     list_init(&zone->orders[MAX_ORDER].free_blocks_head);
 
-    for (int i = 0; i < zone->pages_count / (1 << MAX_ORDER); i++)
+    for (int i = 0; i < (int)zone->pages_count / (1 << MAX_ORDER); i++)
     {
         list_node_t *block_ptr = zone->start_addr + i * (1 << MAX_ORDER) * PAGE_SIZE;
         list_init(block_ptr);
         list_insert(&zone->orders[MAX_ORDER].free_blocks_head, block_ptr);
     }
+
+    return pages_count;
 }
 
 static void *zone_alloc(allocator_zone_t *zone, int order)
 {
-    assert_dbg(zone != NULL);
-    assert(order <= MAX_ORDER);
+    kassert_dbg(zone != NULL);
+    kassert(order <= MAX_ORDER);
 
     list_node_t *order_blocks_head = &zone->orders[order].free_blocks_head;
     if (!list_empty(order_blocks_head))
     {
         // Perfect fit
         list_node_t *block = list_pop(order_blocks_head);
-        memset(block, 0, PAGE_SIZE * (1 << order));
 
+        int block_index = ((uint64_t)block - (uint64_t)zone->start_addr) / ((1 << order) * PAGE_SIZE);
+        int buddy_index = block_index / 2;
+        uint8_t *bitmap = zone->orders[order].bitmap;
+        bitmap[buddy_index / 8] = FLIP_BIT(bitmap[buddy_index / 8], buddy_index % 8);
+        
+        memset(block, 0, PAGE_SIZE * (1 << order));
         return (void*)block;
     }
 
@@ -139,10 +146,10 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
         // Found larger block, split it
 
         list_node_t *curr_split_block = list_pop(order_blocks_head);
-        for (int j = i; j > order; j--)
+        for (int j = i - 1; j >= order; j--)
         {
             list_node_t *first_half  = curr_split_block;
-            list_node_t *second_half = (list_node_t*)FLIP_BIT((uint64_t)curr_split_block, 12 + j + 1);
+            list_node_t *second_half = (list_node_t*)FLIP_BIT((uint64_t)curr_split_block, 12 + j);
 
             list_init(second_half);
             list_insert(&zone->orders[j].free_blocks_head, second_half);
@@ -151,8 +158,9 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
         }
 
         int block_index = ((uint64_t)curr_split_block - (uint64_t)zone->start_addr) / ((1 << order) * PAGE_SIZE);
+        int buddy_index = block_index / 2;
         uint8_t *bitmap = zone->orders[order].bitmap;
-        bitmap[block_index / 8] = FLIP_BIT(bitmap[block_index / 8], block_index % 8);
+        bitmap[buddy_index / 8] = FLIP_BIT(bitmap[buddy_index / 8], buddy_index % 8);
         
         memset(curr_split_block, 0, PAGE_SIZE * (1 << order));
         return (void*)curr_split_block;
@@ -161,133 +169,136 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
     return NULL;
 }
 
-static void zone_dealloc(allocator_zone_t *zone, void* block, int order)
+static void zone_dealloc(allocator_zone_t *zone, uint64_t addr, int order)
 {
-    // TODO:
+    kassert_dbg(zone != NULL);
+    kassert((addr & (~(PAGE_SIZE - 1))) == addr);
+    kassert(order <= MAX_ORDER);
+
+    uint64_t free_block_addr = addr;
+    int free_order = order;
+    for (; free_order < MAX_ORDER; free_order++)
+    {
+        uint64_t buddy_addr = FLIP_BIT(free_block_addr, 12 + order);
+
+        int block_index = (free_order - (uint64_t)zone->start_addr) / ((1 << free_order) * PAGE_SIZE);
+        int buddy_index = block_index / 2;
+        uint8_t *bitmap = zone->orders[free_order].bitmap;
+        if (!GET_BIT(bitmap[buddy_index / 8], buddy_index % 8))
+        {
+            // Buddy is busy - can't coalesce
+            break;
+        }
+        
+        // Coalesce
+        bitmap[buddy_index / 8] = CLEAR_BIT(bitmap[buddy_index / 8], buddy_index % 8);
+        if (buddy_addr < free_block_addr)
+            free_block_addr = buddy_addr;
+    }
+
+    kassert_dbg((addr & (~((1 << (12 + free_order)) - 1))) == free_block_addr);
+
+    // Add final free block to the according list
+    list_node_t *free_block = (list_node_t*)free_block_addr;
+    list_init((list_node_t*)free_block);
+    list_insert(&zone->orders[free_order].free_blocks_head, free_block);
 }
 
-// static bool intersects(frame_t* frame, mem_region_t area)
-// {
-//     return area.start <= (void*)frame && (void*)frame < area.end;
-// }
+static int pages2order(size_t pages)
+{
+    kassert(pages <= (1 << MAX_ORDER));
+    int order = 0;
+    while ((1 << order) < (int)pages)
+        order++;
 
-// static size_t preserved_areas_size = 0;
-// static mem_region_t preserved_areas[100];
+    return order;
+}
 
-// // mark_preserved_area marks memory area as allocated, all its frames are not touched by frame allocator.
-// static void mark_preserved_area(mem_region_t area)
-// {
-//     area.end = (void*)ALIGN_UP(area.end, PAGE_SIZE);
-//     preserved_areas[preserved_areas_size++] = area;
-// }
+// Those constants are defined by linker script.
+extern int _phys_start_kernel_sections;
+extern int _phys_end_kernel_sections;
 
-// // Those constants are defined by linker script.
-// extern int _phys_start_kernel_sections;
-// extern int _phys_end_kernel_sections;
+void frame_alloc_init()
+{
+    mb_memmap_iter_t mmap_it;
+    mb_memmap_iter_init(&mmap_it);
+    mb_memmap_entry_t *mmap_entry;
+    size_t pgcnt = 0;
 
-// // mark_preserved_areas fills pre-allocated regions: early & kernel sections, multiboot info, etc
-// void mark_preserved_areas() {
-//     mark_preserved_area((mem_region_t){ .start = PHYS_TO_VIRT(&_phys_start_kernel_sections), .end = PHYS_TO_VIRT(&_phys_end_kernel_sections) });
-//     mark_preserved_area(multiboot_mem_region());
-// }
+    // Avoid preserved regions
+    uint64_t reserved_end  = (uint64_t)PHYS_TO_VIRT(&_phys_end_kernel_sections);
+    uint64_t reserved_end2 = (uint64_t)mb_memory_region().end;
+    if (reserved_end2 > reserved_end)
+        reserved_end = reserved_end2;
 
-// // intersects_with_kernel_sections checks if a frame at the given virtual address intersects with kernel sections.
-// static bool is_allocated(frame_t* frame)
-// {
-//     for (size_t i = 0; i < preserved_areas_size; i++)
-//     {
-//         if (intersects(frame, preserved_areas[i]))
-//         {
-//             return true;
-//         }
-//     }
-//     return false;
-// }
+    reserved_end = ROUNDUP(reserved_end, PAGE_SIZE);
 
-// static frame_t* freelist_head;
+    while ((mmap_entry = mb_memmap_iter_next(&mmap_it)) != NULL)
+    {
+        if (mmap_entry->type != MB_MEMMAP_TYPE_RAM && mmap_entry->type != MB_MEMMAP_TYPE_HIBER)
+            continue;
 
-// // allocated_memory_region adds a region of RAM to the frame allocator.
-// static size_t frame_alloc_add_area(frame_t* base, size_t sz)
-// {
-//     size_t pgcnt = 0;
-//     frame_t* prev_free = NULL;
-//     frame_t* first_free = NULL;
-//     for (size_t i = 0; i < sz - 1; i++) {
-//         frame_t* curr = &base[i];
-//         if (is_allocated(curr)) {
-//             continue;
-//         }
-//         if (first_free == NULL) {
-//             prev_free = curr;
-//             first_free = curr;
-//             pgcnt++;
-//             continue;
-//         }
-//         prev_free->next = curr;
-//         prev_free = curr;
-//         pgcnt++;
-//     }
-//     prev_free->next = freelist_head;
-//     freelist_head = first_free;
-//     return pgcnt;
-// }
+        uint64_t base_addr = (uint64_t)PHYS_TO_VIRT(mmap_entry->base_addr);
+        base_addr = ROUNDUP(base_addr, PAGE_SIZE);
+        size_t region_size = mmap_entry->length / PAGE_SIZE;
 
-// // frame_alloc_add_areas obtains memory areas of usable RAM from Multiboot2 and adds them to the frame allocator.
-// static void frame_alloc_add_areas()
-// {
-//     mb_memmap_iter_t mmap_it;
-//     mb_memmap_iter_init(&mmap_it);
-//     mb_memmap_entry_t *mmap_entry;
-//     size_t pgcnt = 0;
-//     while ((mmap_entry = mb_memmap_iter_next(&mmap_it)) != NULL)
-//     {
-//         if (mmap_entry->type != MB_MEMMAP_TYPE_RAM)
-//         {
-//             continue;
-//         }
+        if (region_size < (1 << MAX_ORDER))
+        {
+            // Ignore too small zone
+            continue;
+        }
 
-//         pgcnt += frame_alloc_add_area(PHYS_TO_VIRT(mmap_entry->base_addr), mmap_entry->length / PAGE_SIZE);
-//     }
+        if (base_addr < reserved_end)
+        {
+            if (reserved_end >= base_addr + region_size * PAGE_SIZE)
+                continue;
 
-//     printk("initialized page_alloc with %d pages\n", pgcnt);
-// }
+            region_size -= (reserved_end - base_addr) / PAGE_SIZE;
+            base_addr = reserved_end;
+        }
 
-// void frame_alloc_init()
-// {
-//     mark_preserved_areas();
-//     frame_alloc_add_areas();
-// }
+        // printk("zone_add: region at %p with %d pages\n", base_addr, region_size);
+        pgcnt += zone_add(base_addr, region_size);
+    }
 
-// void* frames_alloc(size_t n) 
-// {
-//     if (freelist_head == NULL)
-//     {
-//         return NULL;
-//     }
+    printk("Frame allocator initialized with %d frames\n", pgcnt);
+}
 
-//     BUG_ON(n != 1);
-//     frame_t* frame = freelist_head;
-//     freelist_head = frame->next;
-//     frame->next = NULL;
-//     return frame;
-// }
+void* frames_alloc(size_t n) 
+{
+    int order = pages2order(n);
+    for (int i = 0; i < (int)zones_count; i++)
+    {
+        void* block = zone_alloc(&allocator_zones[i], order);
+        if (block != NULL)
+            return block;
+    }
 
-// void frames_free(void* addr, size_t n)
-// {
-//     BUG_ON(addr == NULL);
-//     BUG_ON(n != 1);
+    return NULL;
+}
 
-//     frame_t* frame = addr;
-//     frame->next = freelist_head;
-//     freelist_head = frame;
-// }
+void frames_free(void* addr, size_t n)
+{
+    int order = pages2order(n);
+    for (int i = 0; i < (int)zones_count; i++)
+    {
+        if ((uint64_t)allocator_zones[i].start_addr <= (uint64_t)addr &&
+            (uint64_t)addr < (uint64_t)allocator_zones[i].end_addr)
+        {
+            zone_dealloc(&allocator_zones[i], (uint64_t)addr, order);
+            return;
+        }
+    }
 
-// void* frame_alloc()
-// {
-//     return frames_alloc(1);
-// }
+    panic("frames_free on unknown address %p", addr);
+}
 
-// void frame_free(void* addr)
-// {
-//     return frames_free(addr, 1);
-// }
+void* frame_alloc()
+{
+    return frames_alloc(1);
+}
+
+void frame_free(void* addr)
+{
+    return frames_free(addr, 1);
+}

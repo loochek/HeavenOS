@@ -23,7 +23,7 @@ void mb_parse_boot_info(early_data_t *early_data)
     mb_boot_info = early_data->multiboot_info;
 
     // Skip fixed part
-    uint8_t *iter = mb_boot_info + sizeof(mb_tag_header_t);
+    uint8_t *iter = mb_boot_info + sizeof(mb_boot_info_header_t);
 
     // Iterate through boot info tags
     bool should_stop = false;
@@ -81,4 +81,15 @@ mb_memmap_entry_t *mb_memmap_iter_next(mb_memmap_iter_t *it)
     mb_memmap_entry_t *ret = it->curr_entry;
     it->curr_entry = (mb_memmap_entry_t*)((uint8_t*)it->curr_entry + mb_memmap_info->entry_size);
     return ret;
+}
+
+mem_region_t mb_memory_region()
+{
+    mem_region_t res =
+    {
+        .start = mb_boot_info,
+        .end   = mb_boot_info + ALIGN_UP(((mb_boot_info_header_t*)mb_boot_info)->total_size, PAGE_SIZE),
+    };
+    
+    return res;
 }

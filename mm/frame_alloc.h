@@ -4,6 +4,11 @@
 #include "common.h"
 
 /**
+ * Initializes frame allocator. Must be called after direct physical memory mapping is created.
+ */
+void frame_alloc_init();
+
+/**
  * Allocates continuous physical memory region.
  * 
  * \param size Amount of frames 
@@ -29,10 +34,5 @@ void frames_free(void* addr, size_t size);
  * \param addr Base address
  */
 void frame_free(void* addr);
-
-/**
- * Initializes frame allocator. Must be called after direct physical memory mapping is created.
- */
-void frame_alloc_init();
 
 #endif

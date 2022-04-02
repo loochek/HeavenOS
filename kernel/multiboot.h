@@ -9,6 +9,12 @@
 #define MB_MEMMAP_TYPE_HIBER     4
 #define MB_MEMMAP_TYPE_DEFECTIVE 5
 
+typedef struct __attribute__((packed)) mb_boot_info_header
+{
+    uint32_t total_size;
+    uint32_t reserved;
+} mb_boot_info_header_t;
+
 typedef struct __attribute__((packed)) mb_tag_header
 {
     uint32_t type;
@@ -90,5 +96,10 @@ void mb_memmap_iter_init(mb_memmap_iter_t *it);
  * \param it Iterator
  */
 mb_memmap_entry_t *mb_memmap_iter_next(mb_memmap_iter_t *it);
+
+/**
+ * \return Memory region occupied by Multiboot boot info
+ */
+mem_region_t mb_memory_region();
 
 #endif

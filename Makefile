@@ -17,7 +17,7 @@ endif
 
 export
 
-QEMU=qemu-system-x86_64
+QEMU=qemu-system-x86_64 -m 2G
 QEMUFLAGS=-cdrom kernel.iso -monitor stdio
 
 ifdef EFI
