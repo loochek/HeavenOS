@@ -10,6 +10,7 @@
 typedef struct list_node
 {
     struct list_node *next;
+    struct list_node *prev;
 } __attribute__((aligned(PAGE_SIZE))) list_node_t;
 
 typedef struct free_blocks_list
@@ -39,14 +40,21 @@ static void list_init(list_node_t *head)
 {
     kassert_dbg(head != NULL);
     head->next = head;
+    head->prev = head;
 }
 
 static void list_insert(list_node_t *head, list_node_t *new)
 {
     kassert_dbg(head != NULL);
     kassert_dbg(new != NULL);
-    new->next = head->next;
+    
+    list_node_t *old_list_next = head->next;
     head->next = new;
+
+    new->prev = head;
+    new->next = old_list_next;
+
+    old_list_next->prev = new;
 }
 
 static list_node_t *list_pop(list_node_t *head)
@@ -57,9 +65,22 @@ static list_node_t *list_pop(list_node_t *head)
 
     list_node_t *ret = head->next;
     head->next = ret->next;
+    ret->next->prev = head;
 
     list_init(ret);
     return ret;
+}
+
+static void list_delete(list_node_t *node)
+{
+    kassert_dbg(node != NULL);
+    kassert_dbg(!list_empty(node));
+
+    list_node_t *prev_elem = node->prev;
+    list_node_t *next_elem = node->next;
+
+    prev_elem->next = next_elem;
+    next_elem->prev = prev_elem;
 }
 
 static size_t zone_add(uint64_t addr, size_t pages_count)
@@ -89,6 +110,7 @@ static size_t zone_add(uint64_t addr, size_t pages_count)
     zone->start_addr = ROUNDUP  (zone->start_addr,  PAGE_SIZE * (1 << MAX_ORDER));
     zone->end_addr   = ROUNDDOWN(zone->start_addr + pages_count * PAGE_SIZE, PAGE_SIZE * (1 << MAX_ORDER));
 
+    // Final pages count value!  
     zone->pages_count = ((uint64_t)zone->end_addr - (uint64_t)zone->start_addr) / PAGE_SIZE;
 
     // 2. Fill bitmaps pointers
@@ -113,7 +135,7 @@ static size_t zone_add(uint64_t addr, size_t pages_count)
         list_insert(&zone->orders[MAX_ORDER].free_blocks_head, block_ptr);
     }
 
-    return pages_count;
+    return zone->pages_count;
 }
 
 static void *zone_alloc(allocator_zone_t *zone, int order)
@@ -146,8 +168,22 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
         // Found larger block, split it
 
         list_node_t *curr_split_block = list_pop(order_blocks_head);
+
+        if (i < MAX_ORDER)
+        {
+            int block_index = ((uint64_t)curr_split_block - (uint64_t)zone->start_addr) / ((1 << i) * PAGE_SIZE);
+            int buddy_index = block_index / 2;
+            uint8_t *bitmap = zone->orders[i].bitmap;
+            bitmap[buddy_index / 8] = FLIP_BIT(bitmap[buddy_index / 8], buddy_index % 8);
+        }
+
         for (int j = i - 1; j >= order; j--)
         {
+            int block_index = ((uint64_t)curr_split_block - (uint64_t)zone->start_addr) / ((1 << j) * PAGE_SIZE);
+            int buddy_index = block_index / 2;
+            uint8_t *bitmap = zone->orders[j].bitmap;
+            bitmap[buddy_index / 8] = SET_BIT(bitmap[buddy_index / 8], buddy_index % 8);
+
             list_node_t *first_half  = curr_split_block;
             list_node_t *second_half = (list_node_t*)FLIP_BIT((uint64_t)curr_split_block, 12 + j);
 
@@ -156,11 +192,6 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
 
             curr_split_block = first_half;
         }
-
-        int block_index = ((uint64_t)curr_split_block - (uint64_t)zone->start_addr) / ((1 << order) * PAGE_SIZE);
-        int buddy_index = block_index / 2;
-        uint8_t *bitmap = zone->orders[order].bitmap;
-        bitmap[buddy_index / 8] = FLIP_BIT(bitmap[buddy_index / 8], buddy_index % 8);
         
         memset(curr_split_block, 0, PAGE_SIZE * (1 << order));
         return (void*)curr_split_block;
@@ -179,19 +210,22 @@ static void zone_dealloc(allocator_zone_t *zone, uint64_t addr, int order)
     int free_order = order;
     for (; free_order < MAX_ORDER; free_order++)
     {
-        uint64_t buddy_addr = FLIP_BIT(free_block_addr, 12 + order);
+        uint64_t buddy_addr = FLIP_BIT(free_block_addr, 12 + free_order);
 
-        int block_index = (free_order - (uint64_t)zone->start_addr) / ((1 << free_order) * PAGE_SIZE);
+        int block_index = (free_block_addr - (uint64_t)zone->start_addr) / ((1 << free_order) * PAGE_SIZE);
         int buddy_index = block_index / 2;
         uint8_t *bitmap = zone->orders[free_order].bitmap;
         if (!GET_BIT(bitmap[buddy_index / 8], buddy_index % 8))
         {
             // Buddy is busy - can't coalesce
+            bitmap[buddy_index / 8] = SET_BIT(bitmap[buddy_index / 8], buddy_index % 8);
             break;
         }
         
         // Coalesce
-        bitmap[buddy_index / 8] = CLEAR_BIT(bitmap[buddy_index / 8], buddy_index % 8);
+        bitmap[buddy_index / 8] = CLEAR_BIT(bitmap[buddy_index / 8], buddy_index % 8);        
+        list_delete((list_node_t*)buddy_addr);
+
         if (buddy_addr < free_block_addr)
             free_block_addr = buddy_addr;
     }
@@ -242,19 +276,23 @@ void frame_alloc_init()
         base_addr = ROUNDUP(base_addr, PAGE_SIZE);
         size_t region_size = mmap_entry->length / PAGE_SIZE;
 
-        if (region_size < (1 << MAX_ORDER))
-        {
-            // Ignore too small zone
-            continue;
-        }
-
         if (base_addr < reserved_end)
         {
+            // I don't want to bother with preserving
+            // a memory region occupied by the kernel an Multiboot info.
+            // So just ignore - we've already wasted a lot of memory)0
+
             if (reserved_end >= base_addr + region_size * PAGE_SIZE)
                 continue;
 
             region_size -= (reserved_end - base_addr) / PAGE_SIZE;
             base_addr = reserved_end;
+        }
+
+        if (region_size < (1 << MAX_ORDER))
+        {
+            // Ignore too small zone
+            continue;
         }
 
         // printk("zone_add: region at %p with %d pages\n", base_addr, region_size);

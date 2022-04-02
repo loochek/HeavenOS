@@ -74,23 +74,12 @@ void kmain(early_data_t *early_data)
     dump_memmap();
     frame_alloc_init();
 
-    void *lol1 = frame_alloc();
-    void *lol2 = frame_alloc();
-    void *lol3 = frame_alloc();
-    void *lol4 = frame_alloc();
-    frame_free(lol1);
-    frame_free(lol2);
-    void *lol5 = frames_alloc(2);
-    frame_free(lol3);
-    frame_free(lol4);
-    void *lol6 = frames_alloc(2);
-    frame_free(lol5);
-    frame_free(lol6);
-    void *lol7 = frames_alloc(4);
+    // for (int i = 0; i < 522240; i++)
+    // {
+    //     kassert(frame_alloc());
+    // }
 
-    (void)lol7;
-
-    // irq_enable();
+    irq_enable();
 
     // *(volatile int*)(-1) = 0xDEAD;
 
