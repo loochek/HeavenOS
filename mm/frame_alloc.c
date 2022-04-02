@@ -30,6 +30,110 @@ typedef struct allocator_zone
 static allocator_zone_t allocator_zones[MAX_ZONE_COUNT] = {0};
 static size_t zones_count = 0;
 
+static bool list_empty(list_node_t *head);
+static void list_init(list_node_t *head);
+static void list_insert(list_node_t *head, list_node_t *new);
+static list_node_t *list_pop(list_node_t *head);
+static void list_delete(list_node_t *node);
+
+static size_t zone_add(uint64_t addr, size_t pages_count);
+static void *zone_alloc(allocator_zone_t *zone, int order);
+static void zone_dealloc(allocator_zone_t *zone, uint64_t addr, int order);
+static int pages2order(size_t pages);
+
+// Those constants are defined by linker script.
+extern int _phys_start_kernel_sections;
+extern int _phys_end_kernel_sections;
+
+void frame_alloc_init()
+{
+    mb_memmap_iter_t mmap_it;
+    mb_memmap_iter_init(&mmap_it);
+    mb_memmap_entry_t *mmap_entry;
+    size_t pgcnt = 0;
+
+    // Avoid preserved regions
+    uint64_t reserved_end  = (uint64_t)PHYS_TO_VIRT(&_phys_end_kernel_sections);
+    uint64_t reserved_end2 = (uint64_t)mb_memory_region().end;
+    if (reserved_end2 > reserved_end)
+        reserved_end = reserved_end2;
+
+    reserved_end = ROUNDUP(reserved_end, PAGE_SIZE);
+
+    while ((mmap_entry = mb_memmap_iter_next(&mmap_it)) != NULL)
+    {
+        if (mmap_entry->type != MB_MEMMAP_TYPE_RAM && mmap_entry->type != MB_MEMMAP_TYPE_HIBER)
+            continue;
+
+        uint64_t base_addr = (uint64_t)PHYS_TO_VIRT(mmap_entry->base_addr);
+        base_addr = ROUNDUP(base_addr, PAGE_SIZE);
+        size_t region_size = mmap_entry->length / PAGE_SIZE;
+
+        if (base_addr < reserved_end)
+        {
+            // I don't want to bother with preserving
+            // a memory region occupied by the kernel an Multiboot info.
+            // So just ignore - we've already wasted a lot of memory)0
+
+            if (reserved_end >= base_addr + region_size * PAGE_SIZE)
+                continue;
+
+            region_size -= (reserved_end - base_addr) / PAGE_SIZE;
+            base_addr = reserved_end;
+        }
+
+        if (region_size < (1 << MAX_ORDER))
+        {
+            // Ignore too small zone
+            continue;
+        }
+
+        // printk("zone_add: region at %p with %d pages\n", base_addr, region_size);
+        pgcnt += zone_add(base_addr, region_size);
+    }
+
+    printk("Frame allocator initialized with %d frames\n", pgcnt);
+}
+
+void* frames_alloc(size_t n) 
+{
+    int order = pages2order(n);
+    for (int i = 0; i < (int)zones_count; i++)
+    {
+        void* block = zone_alloc(&allocator_zones[i], order);
+        if (block != NULL)
+            return block;
+    }
+
+    return NULL;
+}
+
+void frames_free(void* addr, size_t n)
+{
+    int order = pages2order(n);
+    for (int i = 0; i < (int)zones_count; i++)
+    {
+        if ((uint64_t)allocator_zones[i].start_addr <= (uint64_t)addr &&
+            (uint64_t)addr < (uint64_t)allocator_zones[i].end_addr)
+        {
+            zone_dealloc(&allocator_zones[i], (uint64_t)addr, order);
+            return;
+        }
+    }
+
+    panic("frames_free on unknown address %p", addr);
+}
+
+void* frame_alloc()
+{
+    return frames_alloc(1);
+}
+
+void frame_free(void* addr)
+{
+    return frames_free(addr, 1);
+}
+
 static bool list_empty(list_node_t *head)
 {
     kassert_dbg(head != NULL);
@@ -246,97 +350,4 @@ static int pages2order(size_t pages)
         order++;
 
     return order;
-}
-
-// Those constants are defined by linker script.
-extern int _phys_start_kernel_sections;
-extern int _phys_end_kernel_sections;
-
-void frame_alloc_init()
-{
-    mb_memmap_iter_t mmap_it;
-    mb_memmap_iter_init(&mmap_it);
-    mb_memmap_entry_t *mmap_entry;
-    size_t pgcnt = 0;
-
-    // Avoid preserved regions
-    uint64_t reserved_end  = (uint64_t)PHYS_TO_VIRT(&_phys_end_kernel_sections);
-    uint64_t reserved_end2 = (uint64_t)mb_memory_region().end;
-    if (reserved_end2 > reserved_end)
-        reserved_end = reserved_end2;
-
-    reserved_end = ROUNDUP(reserved_end, PAGE_SIZE);
-
-    while ((mmap_entry = mb_memmap_iter_next(&mmap_it)) != NULL)
-    {
-        if (mmap_entry->type != MB_MEMMAP_TYPE_RAM && mmap_entry->type != MB_MEMMAP_TYPE_HIBER)
-            continue;
-
-        uint64_t base_addr = (uint64_t)PHYS_TO_VIRT(mmap_entry->base_addr);
-        base_addr = ROUNDUP(base_addr, PAGE_SIZE);
-        size_t region_size = mmap_entry->length / PAGE_SIZE;
-
-        if (base_addr < reserved_end)
-        {
-            // I don't want to bother with preserving
-            // a memory region occupied by the kernel an Multiboot info.
-            // So just ignore - we've already wasted a lot of memory)0
-
-            if (reserved_end >= base_addr + region_size * PAGE_SIZE)
-                continue;
-
-            region_size -= (reserved_end - base_addr) / PAGE_SIZE;
-            base_addr = reserved_end;
-        }
-
-        if (region_size < (1 << MAX_ORDER))
-        {
-            // Ignore too small zone
-            continue;
-        }
-
-        // printk("zone_add: region at %p with %d pages\n", base_addr, region_size);
-        pgcnt += zone_add(base_addr, region_size);
-    }
-
-    printk("Frame allocator initialized with %d frames\n", pgcnt);
-}
-
-void* frames_alloc(size_t n) 
-{
-    int order = pages2order(n);
-    for (int i = 0; i < (int)zones_count; i++)
-    {
-        void* block = zone_alloc(&allocator_zones[i], order);
-        if (block != NULL)
-            return block;
-    }
-
-    return NULL;
-}
-
-void frames_free(void* addr, size_t n)
-{
-    int order = pages2order(n);
-    for (int i = 0; i < (int)zones_count; i++)
-    {
-        if ((uint64_t)allocator_zones[i].start_addr <= (uint64_t)addr &&
-            (uint64_t)addr < (uint64_t)allocator_zones[i].end_addr)
-        {
-            zone_dealloc(&allocator_zones[i], (uint64_t)addr, order);
-            return;
-        }
-    }
-
-    panic("frames_free on unknown address %p", addr);
-}
-
-void* frame_alloc()
-{
-    return frames_alloc(1);
-}
-
-void frame_free(void* addr)
-{
-    return frames_free(addr, 1);
 }
