@@ -10,12 +10,22 @@ typedef struct obj_alloc
     size_t obj_size;
 } obj_alloc_t;
 
+// Creates allocator for specified type of objects
 #define OBJ_ALLOC_DEFINE(var, type) obj_alloc_t var = { .next_free = NULL, .obj_size = sizeof(type) }
 
-// object_alloc allocates single object and returns its virtual address.
+/**
+ * Allocates single object and returns its virtual address.
+ * 
+ * \param alloc Object allocator
+ */
 void* object_alloc(obj_alloc_t* alloc);
 
-// object_free frees obj associated with given allocator.
+/**
+ * Frees objecy associated with given allocator
+ * 
+ * \param alloc Object allocator
+ * \param obj Object
+ */
 void object_free(obj_alloc_t* alloc, void* obj);
 
 #endif
