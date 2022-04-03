@@ -36,6 +36,7 @@ kernel.bin:
 	$(MAKE) -C drivers/
 	$(MAKE) -C kernel/
 	$(MAKE) -C mm/
+	$(MAKE) -C utils/
 	$(LD) $(LDFLAGS) -T <(cpp -P -E linker.ld) -z max-page-size=4096 `find $(ROOT) -name '*.o'` -o kernel.bin
 	$(OBJCOPY) --only-keep-debug kernel.bin kernel.sym
 	$(OBJCOPY) --strip-debug kernel.bin
@@ -51,6 +52,7 @@ clean:
 	$(MAKE) -C drivers/ clean
 	$(MAKE) -C kernel/ clean
 	$(MAKE) -C mm/ clean
+	$(MAKE) -C utils/ clean
 	rm -f kernel.bin
 	rm -f kernel.sym
 	rm -f kernel.iso

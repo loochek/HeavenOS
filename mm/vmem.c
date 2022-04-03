@@ -1,6 +1,14 @@
-#include "vmem.h"
-#include "frame_alloc.h"
-#include "paging.h"
+#include "arch/x86.h"
+#include "kernel/panic.h"
+#include "mm/vmem.h"
+#include "mm/frame_alloc.h"
+
+// static bool is_mapped(vmem_t* vm, uint64_t addr)
+// {
+//     kassert_dbg((addr & (~(PAGE_SIZE - 1))) == addr);
+
+
+// }
 
 static void vmem_map_page(vmem_t* vm, void* virt_addr, void* frame) {
     uint64_t pml4e = vm->pml4->entries[PML4E_FROM_ADDR(virt_addr)];

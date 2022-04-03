@@ -3,15 +3,10 @@
 #include "kernel/panic.h"
 #include "mm/paging.h"
 #include "mm/frame_alloc.h"
+#include "utils/list.h"
 
 #define MAX_ORDER 10
 #define MAX_ZONE_COUNT 10
-
-typedef struct list_node
-{
-    struct list_node *next;
-    struct list_node *prev;
-} __attribute__((aligned(PAGE_SIZE))) list_node_t;
 
 typedef struct free_blocks_list
 {
@@ -29,12 +24,6 @@ typedef struct allocator_zone
 
 static allocator_zone_t allocator_zones[MAX_ZONE_COUNT] = {0};
 static size_t zones_count = 0;
-
-static bool list_empty(list_node_t *head);
-static void list_init(list_node_t *head);
-static void list_insert(list_node_t *head, list_node_t *new);
-static list_node_t *list_pop(list_node_t *head);
-static void list_delete(list_node_t *node);
 
 static size_t zone_add(uint64_t addr, size_t pages_count);
 static void *zone_alloc(allocator_zone_t *zone, int order);
@@ -134,64 +123,11 @@ void frame_free(void* addr)
     return frames_free(addr, 1);
 }
 
-static bool list_empty(list_node_t *head)
-{
-    kassert_dbg(head != NULL);
-    return head->next == head;
-}
-
-static void list_init(list_node_t *head)
-{
-    kassert_dbg(head != NULL);
-    head->next = head;
-    head->prev = head;
-}
-
-static void list_insert(list_node_t *head, list_node_t *new)
-{
-    kassert_dbg(head != NULL);
-    kassert_dbg(new != NULL);
-    
-    list_node_t *old_list_next = head->next;
-    head->next = new;
-
-    new->prev = head;
-    new->next = old_list_next;
-
-    old_list_next->prev = new;
-}
-
-static list_node_t *list_pop(list_node_t *head)
-{
-    kassert_dbg(head != NULL);
-    if (list_empty(head))
-        return NULL;
-
-    list_node_t *ret = head->next;
-    head->next = ret->next;
-    ret->next->prev = head;
-
-    list_init(ret);
-    return ret;
-}
-
-static void list_delete(list_node_t *node)
-{
-    kassert_dbg(node != NULL);
-    kassert_dbg(!list_empty(node));
-
-    list_node_t *prev_elem = node->prev;
-    list_node_t *next_elem = node->next;
-
-    prev_elem->next = next_elem;
-    next_elem->prev = prev_elem;
-}
-
 static size_t zone_add(uint64_t addr, size_t pages_count)
 {
-    kassert((addr & (~(PAGE_SIZE - 1))) == addr);
-    kassert(pages_count > (1 << MAX_ORDER));
-    kassert(zones_count < MAX_ZONE_COUNT);
+    kassert_dbg((addr & (~(PAGE_SIZE - 1))) == addr);
+    kassert_dbg(pages_count > (1 << MAX_ORDER));
+    kassert_dbg(zones_count < MAX_ZONE_COUNT);
 
     allocator_zone_t *zone = &allocator_zones[zones_count++];
     zone->start_addr = (void*)addr;
@@ -236,7 +172,7 @@ static size_t zone_add(uint64_t addr, size_t pages_count)
     {
         list_node_t *block_ptr = zone->start_addr + i * (1 << MAX_ORDER) * PAGE_SIZE;
         list_init(block_ptr);
-        list_insert(&zone->orders[MAX_ORDER].free_blocks_head, block_ptr);
+        list_insert_after(&zone->orders[MAX_ORDER].free_blocks_head, block_ptr);
     }
 
     return zone->pages_count;
@@ -245,13 +181,14 @@ static size_t zone_add(uint64_t addr, size_t pages_count)
 static void *zone_alloc(allocator_zone_t *zone, int order)
 {
     kassert_dbg(zone != NULL);
-    kassert(order <= MAX_ORDER);
+    kassert_dbg(order <= MAX_ORDER);
 
     list_node_t *order_blocks_head = &zone->orders[order].free_blocks_head;
     if (!list_empty(order_blocks_head))
     {
         // Perfect fit
-        list_node_t *block = list_pop(order_blocks_head);
+        list_node_t *block = order_blocks_head->next;
+        list_extract(block);
 
         int block_index = ((uint64_t)block - (uint64_t)zone->start_addr) / ((1 << order) * PAGE_SIZE);
         int buddy_index = block_index / 2;
@@ -269,9 +206,10 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
         if (list_empty(order_blocks_head))
             continue;
 
-        // Found larger block, split it
+        // Larger block is present, split it
 
-        list_node_t *curr_split_block = list_pop(order_blocks_head);
+        list_node_t *curr_split_block = order_blocks_head->next;
+        list_extract(curr_split_block);
 
         if (i < MAX_ORDER)
         {
@@ -292,7 +230,7 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
             list_node_t *second_half = (list_node_t*)FLIP_BIT((uint64_t)curr_split_block, 12 + j);
 
             list_init(second_half);
-            list_insert(&zone->orders[j].free_blocks_head, second_half);
+            list_insert_after(&zone->orders[j].free_blocks_head, second_half);
 
             curr_split_block = first_half;
         }
@@ -307,8 +245,8 @@ static void *zone_alloc(allocator_zone_t *zone, int order)
 static void zone_dealloc(allocator_zone_t *zone, uint64_t addr, int order)
 {
     kassert_dbg(zone != NULL);
-    kassert((addr & (~(PAGE_SIZE - 1))) == addr);
-    kassert(order <= MAX_ORDER);
+    kassert_dbg((addr & (~(PAGE_SIZE - 1))) == addr);
+    kassert_dbg(order <= MAX_ORDER);
 
     uint64_t free_block_addr = addr;
     int free_order = order;
@@ -328,7 +266,7 @@ static void zone_dealloc(allocator_zone_t *zone, uint64_t addr, int order)
         
         // Coalesce
         bitmap[buddy_index / 8] = CLEAR_BIT(bitmap[buddy_index / 8], buddy_index % 8);        
-        list_delete((list_node_t*)buddy_addr);
+        list_extract((list_node_t*)buddy_addr);
 
         if (buddy_addr < free_block_addr)
             free_block_addr = buddy_addr;
@@ -339,12 +277,12 @@ static void zone_dealloc(allocator_zone_t *zone, uint64_t addr, int order)
     // Add final free block to the according list
     list_node_t *free_block = (list_node_t*)free_block_addr;
     list_init((list_node_t*)free_block);
-    list_insert(&zone->orders[free_order].free_blocks_head, free_block);
+    list_insert_after(&zone->orders[free_order].free_blocks_head, free_block);
 }
 
 static int pages2order(size_t pages)
 {
-    kassert(pages <= (1 << MAX_ORDER));
+    kassert_dbg(pages <= (1 << MAX_ORDER));
     int order = 0;
     while ((1 << order) < (int)pages)
         order++;
