@@ -81,8 +81,6 @@ void kmain(early_data_t *early_data)
     //     kassert(frame_alloc());
     // }
 
-    // 
-
     // Lazy allocation test
     vmem_t vmem;
     vmem_init_from_current(&vmem);
@@ -95,6 +93,16 @@ void kmain(early_data_t *early_data)
 
     *(volatile int*)((uint64_t)0x40000000 + 0x40000000 - PAGE_SIZE) = 0xAAA; // Success
     *(volatile int*)((uint64_t)0x40000000 + 0x40000000) = 0xDEAD; // Fault
+
+    // Lazy allocation test 2
+    // vmem_t vmem;
+    // vmem_init_from_current(&vmem);
+    // vmem_alloc_pages(&vmem, (void*)0x40000000, 1);
+    // vmem_alloc_pages(&vmem, (void*)0x40002000, 1);
+
+    // *(volatile int*)(0x40000000) = 0xAAA; // Success
+    // *(volatile int*)(0x40000000 + (uint64_t)2 * PAGE_SIZE) = 0xAAA; // Success
+    // *(volatile int*)(0x40000000 + PAGE_SIZE) = 0xAAA; // Fault
 
     panic("manually initiated %s", "panic");
 }
