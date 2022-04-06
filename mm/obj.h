@@ -21,7 +21,7 @@ typedef struct obj_alloc
 void* object_alloc(obj_alloc_t* alloc);
 
 /**
- * Frees objecy associated with given allocator
+ * Frees object associated with given allocator
  * 
  * \param alloc Object allocator
  * \param obj Object

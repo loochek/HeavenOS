@@ -11,7 +11,7 @@ typedef struct vmem_area
     list_node_t node;
 
     uint64_t start;
-    uint64_t size; // In pages
+    size_t size; // In pages
 } vmem_area_t;
 
 /// Virtual address space abstraction
@@ -48,7 +48,9 @@ void vmem_alloc_pages(vmem_t* vm, void* virt_addr, size_t pgcnt);
  * Page fault handler for on-demand allocation
  * 
  * \param fault_addr Fault address
+ * 
+ * \return True if on-demand allocation was performed, false if it's a real page fault
  */
-void vmem_handle_pf(void* fault_addr);
+bool vmem_handle_pf(void* fault_addr);
 
 #endif

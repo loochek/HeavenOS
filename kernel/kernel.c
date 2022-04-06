@@ -8,7 +8,8 @@
 #include "drivers/acpi.h"
 #include "drivers/apic.h"
 #include "mm/paging.h"
-#include "mm//frame_alloc.h"
+#include "mm/frame_alloc.h"
+#include "mm/vmem.h"
 
 void dump_memmap()
 {
@@ -74,14 +75,26 @@ void kmain(early_data_t *early_data)
     dump_memmap();
     frame_alloc_init();
 
+    // Frame allocator test
     // for (int i = 0; i < 522240; i++)
     // {
     //     kassert(frame_alloc());
     // }
 
+    // 
+
+    // Lazy allocation test
+    vmem_t vmem;
+    vmem_init_from_current(&vmem);
+    vmem_alloc_pages(&vmem, (void*)0x40000000, 262144);
+
     irq_enable();
 
-    // *(volatile int*)(-1) = 0xDEAD;
+    for (int i = 0; i < 20; i += 2)
+        *(volatile int*)(0x40000000 + (uint64_t)i * PAGE_SIZE) = 0xAAA; // Success
+
+    *(volatile int*)((uint64_t)0x40000000 + 0x40000000 - PAGE_SIZE) = 0xAAA; // Success
+    *(volatile int*)((uint64_t)0x40000000 + 0x40000000) = 0xDEAD; // Fault
 
     panic("manually initiated %s", "panic");
 }

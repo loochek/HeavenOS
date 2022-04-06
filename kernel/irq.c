@@ -2,6 +2,7 @@
 #include "kernel/panic.h"
 #include "arch/x86.h"
 #include "drivers/apic.h"
+#include "mm/vmem.h"
 
 static const char *exc_names[] =
 {
@@ -36,6 +37,12 @@ static const char *get_irq_name(int irq_num);
 
 void irq_handler(struct irqctx* ctx)
 {
+    if (ctx->irq_num == IRQ_PF)
+    {
+        if (vmem_handle_pf((void*)x86_read_cr2()))
+            return;
+    }
+
     switch (ctx->irq_num)
     {
     case IRQ_TIMER:
