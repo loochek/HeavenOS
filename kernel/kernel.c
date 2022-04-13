@@ -61,7 +61,7 @@ void unmap_early()
 
 void kmain(early_data_t *early_data)
 {
-    // unmap_early();
+    unmap_early();
     irq_init();
     mb_parse_boot_info(early_data);
     fb_init(mb_fb_info);
@@ -94,7 +94,7 @@ void kmain(early_data_t *early_data)
     *(volatile int*)((uint64_t)0x40000000 + 0x40000000 - PAGE_SIZE) = 0xAAA; // Success
     *(volatile int*)((uint64_t)0x40000000 + 0x40000000) = 0xDEAD; // Fault
 
-    // Lazy allocation test 2
+    // // Lazy allocation test 2
     // vmem_t vmem;
     // vmem_init_from_current(&vmem);
     // vmem_alloc_pages(&vmem, (void*)0x40000000, 1);
@@ -102,7 +102,11 @@ void kmain(early_data_t *early_data)
 
     // *(volatile int*)(0x40000000) = 0xAAA; // Success
     // *(volatile int*)(0x40000000 + (uint64_t)2 * PAGE_SIZE) = 0xAAA; // Success
+
     // *(volatile int*)(0x40000000 + PAGE_SIZE) = 0xAAA; // Fault
+
+    // vmem_free_pages(&vmem, (void*)0x40000000, 1);
+    // vmem_free_pages(&vmem, (void*)0x40002000, 1);
 
     panic("manually initiated %s", "panic");
 }

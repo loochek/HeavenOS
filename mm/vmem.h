@@ -45,6 +45,15 @@ void vmem_switch_to(vmem_t* vm);
 void vmem_alloc_pages(vmem_t* vm, void* virt_addr, size_t pgcnt);
 
 /**
+ * Frees memory region in given address space
+ * 
+ * \param vm Address space
+ * \param virt_addr Region start address
+ * \param pgcnt Region size in pages
+ */
+void vmem_free_pages(vmem_t* vm, void* virt_addr, size_t pgcnt);
+
+/**
  * Page fault handler for on-demand allocation
  * 
  * \param fault_addr Fault address

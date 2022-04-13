@@ -11,6 +11,7 @@ static vmem_t *curr_vmem = NULL;
 static bool vmem_is_mapped (vmem_t* vm, uint64_t addr);
 static bool vmem_intersects(vmem_t* vm, uint64_t other_start_addr, uint64_t other_size);
 static void vmem_map_page  (vmem_t* vm, void* virt_addr, void* frame);
+static void vmem_unmap_page(vmem_t* vm, void* virt_addr);
 
 void vmem_alloc_pages(vmem_t* vm, void* virt_addr, size_t pgcnt)
 {
@@ -24,6 +25,37 @@ void vmem_alloc_pages(vmem_t* vm, void* virt_addr, size_t pgcnt)
     new_area->size = pgcnt;
     list_init(&new_area->node);
     list_insert_after(&vm->areas_list->node, &new_area->node);
+}
+
+void vmem_free_pages(vmem_t* vm, void* virt_addr, size_t pgcnt)
+{
+    kassert_dbg(((uint64_t)virt_addr & (~(PAGE_SIZE - 1))) == (uint64_t)virt_addr);
+
+    uint64_t start_addr = (uint64_t)virt_addr;
+    uint64_t end_addr   = start_addr + PAGE_SIZE * pgcnt;
+
+    list_node_t *area_node = vm->areas_list->node.next;
+    bool found = false;
+    while (area_node != &vm->areas_list->node)
+    {
+        vmem_area_t *area = (vmem_area_t*)area_node;
+        if (start_addr == area->start && area->start + area->size * PAGE_SIZE == end_addr)
+        {
+            found = true;
+            break;
+        }
+
+        area_node = area_node->next;
+    }
+
+    if (!found)
+        panic("alloc-free mismatch in vmem at %p", vm);
+
+    list_extract(area_node);
+    object_free(&vmem_area_alloc, area_node);
+
+    for (uint64_t addr = start_addr; addr < end_addr; addr += PAGE_SIZE)
+        vmem_unmap_page(vm, (void*)addr);
 }
 
 void vmem_init_from_current(vmem_t* vm)
@@ -123,4 +155,24 @@ static void vmem_map_page(vmem_t* vm, void* virt_addr, void* frame)
     }
 
     pgtbl->entries[PTE_FROM_ADDR(virt_addr)] = (uint64_t)VIRT_TO_PHYS(frame) | PTE_PRESENT;
+}
+
+static void vmem_unmap_page(vmem_t* vm, void* virt_addr)
+{
+    uint64_t pml4e = vm->pml4->entries[PML4E_FROM_ADDR(virt_addr)];
+    if (!(pml4e & PTE_PRESENT))
+        return;
+
+    pdpt_t*  pdpt = PHYS_TO_VIRT(PTE_ADDR(pml4e));
+    uint64_t pdpe = pdpt->entries[PDPE_FROM_ADDR(virt_addr)];
+    if (!(pdpe & PTE_PRESENT))
+        return;
+
+    pgdir_t* pgdir = PHYS_TO_VIRT(PTE_ADDR(pdpe));
+    uint64_t pde = pgdir->entries[PDE_FROM_ADDR(virt_addr)];
+    if (!(pde & PTE_PRESENT))
+        return;
+
+    pgtbl_t* pgtbl = PHYS_TO_VIRT(PTE_ADDR(pde));
+    pgtbl->entries[PTE_FROM_ADDR(virt_addr)] = 0;
 }

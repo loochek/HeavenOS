@@ -118,6 +118,12 @@ section .early.text
         lea rax, kmain_return
         push rax
 
+        ; Fix GDT pointer
+        lea rax, gdt64
+        add rax, rbx
+        mov qword [gdt64_ptr + 2], rax
+        lgdt [gdt64_ptr]
+
         ; Use lea to indicate that we want use imm64.
         lea rax, kmain
         lea rdi, early_data
