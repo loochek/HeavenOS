@@ -4,22 +4,22 @@ KERNEL_CODE64: equ 8
 ; params: vec selector flags
 %macro IDT_ENTRY 3
     ; rbx = &IDT[vec]
-    lea rbx, idt + %1 * IDT_DESC_SIZE
+    lea rbx, [idt + %1 * IDT_DESC_SIZE]
 
     ; first dword = (segment selector << 16) | (entry & 0xFFFF)
-    lea rax, _irq_entry_%1
+    lea rax, [_irq_entry_%1]
     and eax, 0xFFFF
     or  eax, %2 << 16
     mov dword [rbx], eax
 
     ; second dword = (entry & 0xFFFF0000) | (flags << 8)
-    lea rax, _irq_entry_%1
+    lea rax, [_irq_entry_%1]
     and eax, 0xFFFF0000
     or  eax, (%3 << 8)
     mov dword [rbx + 4], eax
 
     ; third dword = entry >> 32
-    lea rax, _irq_entry_%1
+    lea rax, [_irq_entry_%1]
     shr rax, 32
     mov dword [ebx + 8], eax
 
