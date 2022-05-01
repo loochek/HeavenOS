@@ -33,6 +33,7 @@ kernel.iso: kernel.bin
 
 kernel.bin:
 	$(MAKE) -C boot/
+	$(MAKE) -C arch/x86/
 	$(MAKE) -C drivers/
 	$(MAKE) -C kernel/
 	$(MAKE) -C mm/
@@ -49,6 +50,7 @@ qemu-gdb: kernel.iso
 
 clean:
 	$(MAKE) -C boot/ clean
+	$(MAKE) -C arch/x86/ clean
 	$(MAKE) -C drivers/ clean
 	$(MAKE) -C kernel/ clean
 	$(MAKE) -C mm/ clean

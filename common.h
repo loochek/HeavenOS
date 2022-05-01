@@ -7,7 +7,7 @@
 #include <stddef.h>
 
 /// HeavenOS version to display
-#define HEAVENOS_VERSION "hw3-dev"
+#define HEAVENOS_VERSION "hw4-dev"
 
 #define PAGE_SIZE 4096
 
@@ -34,6 +34,8 @@
 #define SET_BIT(val, bit) ((val) | (1 << (bit)))
 #define CLEAR_BIT(val, bit) ((val) & (~(1 << (bit))))
 #define FLIP_BIT(val, bit) ((val) ^ (1 << (bit)))
+
+#define UNUSED(x) (void)(x)
 
 typedef struct mem_region
 {

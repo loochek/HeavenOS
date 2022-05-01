@@ -1,4 +1,4 @@
-#include "arch/x86.h"
+#include "arch/x86/x86.h"
 #include "kernel/panic.h"
 #include "mm/vmem.h"
 #include "mm/frame_alloc.h"

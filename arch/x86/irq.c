@@ -1,8 +1,8 @@
-#include "kernel/irq.h"
-#include "kernel/panic.h"
-#include "arch/x86.h"
-#include "drivers/apic.h"
-#include "mm/vmem.h"
+#include <arch/x86/irq.h>
+#include <kernel/panic.h>
+#include <arch/x86/x86.h>
+#include <drivers/apic.h>
+#include <mm/vmem.h>
 
 static const char *exc_names[] =
 {
