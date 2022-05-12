@@ -3,6 +3,7 @@
 #include <arch/x86/x86.h>
 #include <drivers/apic.h>
 #include <mm/vmem.h>
+#include <sched/sched.h>
 
 static const char *exc_names[] =
 {
@@ -62,8 +63,8 @@ void irq_handler(struct irqctx* ctx)
 
 static void timer_handler()
 {
-    printk(".");
     apic_eoi();
+    sched_timer_tick();
 }
 
 static void spurious_handler()

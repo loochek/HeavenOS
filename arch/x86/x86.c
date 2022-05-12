@@ -7,7 +7,6 @@
 #include <mm/paging.h>
 #include <mm/frame_alloc.h>
 #include <kernel/irq.h>
-#include <kernel/errno.h>
 
 static x86_tss_t tss;
 
@@ -100,8 +99,18 @@ static void syscall_init()
 
 extern void irq_init();
 
+extern pml4_t early_pml4;
+
+static void unmap_early()
+{
+    pml4_t *pml4_virt = PHYS_TO_VIRT(&early_pml4);
+    pdpt_t *pdpd_virt = PHYS_TO_VIRT(pml4_virt->entries[0] & (~0xFFF));
+    pdpd_virt->entries[0] = 0;
+}
+
 void arch_init()
 {
+    unmap_early();
     // After entering higher-half code, GDT needs to be relocated as well.
     gdt_init();
     load_tss();
@@ -119,11 +128,9 @@ static int allocate_kstack(arch_thread_t* th)
 {
     th->kstack_top = frame_alloc();
     if (th->kstack_top == NULL)
-    {
         return -ENOMEM;
-    }
     
-    memset(th->kstack_top, '\0', PAGE_SIZE);
+    memset(th->kstack_top, 0, PAGE_SIZE);
     th->kstack_top += PAGE_SIZE;
     return 0;
 }
@@ -135,22 +142,20 @@ int arch_thread_new(arch_thread_t* th, arch_regs_t** result_regs)
 {
     int err = allocate_kstack(th);
     if (err < 0)
-    {
         return err;
-    }
 
     uint8_t* kstack_top = th->kstack_top;
     kstack_top -= sizeof(arch_regs_t);
     arch_regs_t* regs = (arch_regs_t*)kstack_top;
     regs->rsp = 0x70000000 + 4*PAGE_SIZE;
     regs->ss = GDT_SEGMENT_SELECTOR(USER_DATA_SEG, RPL_RING3);
+    // regs->ss = GDT_SEGMENT_SELECTOR(KERNEL_DATA_SEG, RPL_RING0);
     regs->rip = (uint64_t)user_program;
     regs->cs = GDT_SEGMENT_SELECTOR(USER_CODE_SEG, RPL_RING3);
+    // regs->cs = GDT_SEGMENT_SELECTOR(KERNEL_CODE_SEG, RPL_RING0);
     regs->rflags = RFLAGS_IF;
     if (result_regs != NULL)
-    {
         *result_regs = regs;
-    }
 
     kstack_top -= sizeof(on_stack_context_t);
     on_stack_context_t* onstack_ctx = (on_stack_context_t*)kstack_top;
@@ -165,16 +170,12 @@ int arch_thread_clone(arch_thread_t* dst, arch_regs_t** regs, arch_thread_t* src
 
     int err = allocate_kstack(dst);
     if (err < 0)
-    {
         return err;
-    }
 
     uint8_t* kstack_top = dst->kstack_top;
     kstack_top -= sizeof(arch_regs_t);
     if (regs != NULL)
-    {
         *regs = (arch_regs_t*)kstack_top;
-    }
 
     kstack_top -= sizeof(on_stack_context_t);
     on_stack_context_t* onstack_ctx = (on_stack_context_t*)kstack_top;

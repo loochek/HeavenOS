@@ -1,8 +1,9 @@
-#ifndef SYSCALL_H
-#define SYSCALL_H
+#ifndef KERN_SYSCALL_H
+#define KERN_SYSCALL_H
 
 #include <stdint.h>
 #include <arch/x86/arch.h>
+#include <arch/x86/syscall.h>
 
 enum
 {

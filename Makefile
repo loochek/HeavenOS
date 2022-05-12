@@ -17,7 +17,7 @@ endif
 
 export
 
-QEMU=qemu-system-x86_64 -m 2G
+QEMU=qemu-system-x86_64
 QEMUFLAGS=-cdrom kernel.iso -monitor stdio
 
 ifdef EFI
@@ -37,6 +37,7 @@ kernel.bin:
 	$(MAKE) -C drivers/
 	$(MAKE) -C kernel/
 	$(MAKE) -C mm/
+	$(MAKE) -C sched/
 	$(MAKE) -C utils/
 	$(LD) $(LDFLAGS) -T <(cpp -P -E linker.ld) -z max-page-size=4096 `find $(ROOT) -name '*.o'` -o kernel.bin
 	$(OBJCOPY) --only-keep-debug kernel.bin kernel.sym
@@ -54,6 +55,7 @@ clean:
 	$(MAKE) -C drivers/ clean
 	$(MAKE) -C kernel/ clean
 	$(MAKE) -C mm/ clean
+	$(MAKE) -C sched/ clean
 	$(MAKE) -C utils/ clean
 	rm -f kernel.bin
 	rm -f kernel.sym

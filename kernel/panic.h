@@ -9,6 +9,7 @@
 void __panic(const char* location, const char* fmt, ...);
 
 #define panic(msg, ...) __panic(__FILE__ ":" __S2(__LINE__), msg __VA_OPT__(,) __VA_ARGS__)
+#define panic_on_reach() panic("reached unreachable")
 
 /**
  * Checks expression to be true, panics otherwise. 

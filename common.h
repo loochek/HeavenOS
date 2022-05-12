@@ -37,6 +37,12 @@
 
 #define UNUSED(x) (void)(x)
 
+// Error codes
+
+#define ENOSYS 1
+#define ENOMEM 2
+#define EINVAL 3
+
 typedef struct mem_region
 {
     void* start;

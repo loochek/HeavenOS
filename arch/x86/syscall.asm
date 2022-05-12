@@ -1,6 +1,14 @@
 extern _current
 extern do_syscall
 
+RPL_RING3: equ 3
+RPL_RING0: equ 0
+
+KERNEL_CODE_SEG: equ (1 << 3) | RPL_RING0
+KERNEL_DATA_SEG: equ (2 << 3) | RPL_RING0
+USER_DATA_SEG:   equ (3 << 3) | RPL_RING3
+USER_CODE_SEG:   equ (4 << 3) | RPL_RING3
+
 %macro PUSH_REGS 0
     push rax
     push rbx
@@ -48,7 +56,7 @@ section .bss
 ; This is an entry point for syscall instruction.
 ; On enter, following holds:
 ;   rax contains syscall number;
-;   rdi, rsi, rdx, rcx, r8, r9 contain syscall arguments (in order);
+;   rdi, rsi, rdx, r10, r8, r9 contain syscall arguments (in order);
 ;   rcx contains userspace rip;
 ;   r11 contains userspace rflags;
 ;   rsp contains *userspace* stack (it may be corrupted or not mapped);
@@ -67,8 +75,29 @@ section .text
         ; We have a reliable stack now, enable interrupts.
         sti
 
-        ; TODO: construct arch_regs_t on stack and call do_syscall.
+        ; ss
+        push qword USER_DATA_SEG
+        ; rsp
+        push qword [saved_rsp]
+        ; rflags
+        push r11
+        ; cs
+        push qword USER_CODE_SEG
+        ; rip
+        push rcx
+        ; errcode
+        push qword 0
+        ; General purpose registers
+        PUSH_REGS
 
+        ; do_syscall args
+        mov rdi, rax
+        mov rsi, rsp
+
+        call do_syscall
+        ; Return value in rax
+        ; Note that caller-saved registers are not affected at all (as do_syscall respects the ABI)
+        ; (only rsp, but it's restored on the next line)
 
         ; Restore user-space rsp.
         mov rsp, qword [saved_rsp]

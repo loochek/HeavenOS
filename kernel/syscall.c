@@ -1,6 +1,5 @@
 #include <kernel/syscall.h>
 #include <kernel/printk.h>
-#include <kernel/errno.h>
 #include <arch/x86/arch.h>
 #include <sched/sched.h>
 #include <common.h>
@@ -10,6 +9,7 @@ int64_t sys_sleep(arch_regs_t* regs)
     uint64_t ms = syscall_arg0(regs);
     // TODO: implement me.
 
+    (void)ms;
     return 0;
 }
 
@@ -27,9 +27,8 @@ syscall_fn_t syscall_table[] = {
 uint64_t do_syscall(uint64_t sysno, arch_regs_t* regs)
 {
     if (sysno >= SYS_MAX)
-    {
         return -ENOSYS;
-    }
+
     syscall_fn_t syscall = syscall_table[sysno];
     return syscall(regs);
 }

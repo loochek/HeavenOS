@@ -6,6 +6,7 @@
 
 #define PTE_PRESENT   (1ull << 0)
 #define PTE_WRITEABLE (1ull << 1)
+#define PTE_USER      (1ull << 2)
 #define PTE_PAGE_SIZE (1ull << 7)
 
 #define PTE_FLAGS_MASK ((1ull << 12) - 1)
@@ -22,24 +23,26 @@
 #define PHYS_TO_VIRT(addr) ((void*)(KERNEL_DIRECT_PHYS_MAPPING_START + (uint64_t)(addr)))
 #define VIRT_TO_PHYS(addr) ((void*)((uint64_t)(addr) - KERNEL_DIRECT_PHYS_MAPPING_START))
 
+typedef uint64_t pte_t;
+
 typedef struct pml4
 {
-    uint64_t entries[512];
+    pte_t entries[512];
 } ATTR_ALIGN_4096 pml4_t;
 
 typedef struct pdpt
 {
-    uint64_t entries[512];
+    pte_t entries[512];
 } ATTR_ALIGN_4096 pdpt_t;
 
 typedef struct pgdir
 {
-    uint64_t entries[512];
+    pte_t entries[512];
 } ATTR_ALIGN_4096 pgdir_t;
 
 typedef struct pgtbl
 {
-    uint64_t entries[512];
+    pte_t entries[512];
 } ATTR_ALIGN_4096 pgtbl_t;
 
 #endif

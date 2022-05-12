@@ -31,6 +31,23 @@ typedef struct task
 extern task_t* _current;
 #define sched_current() _current
 
+/**
+ * Starts scheduling
+ */
 void sched_start();
+
+/**
+ * Switches back to scheduler context
+ */
 void sched_switch();
+
+/**
+ * Preemptive multitasking provider
+ */
 void sched_timer_tick();
+
+/**
+ */
+void sched_yield();
+
+#endif
