@@ -126,7 +126,7 @@ void vmem_switch_to(vmem_t* vm)
     curr_vmem = vm;
 }
 
-// TODO: finish
+// TODO: seems to be correct - check
 void vmem_destroy(vmem_t* vm)
 {
     // Free page table
@@ -145,15 +145,28 @@ void vmem_destroy(vmem_t* vm)
 
             if (!(pdpte & PTE_PAGE_SIZE))
             {
-                pgdir_t *pgdir = PHYS_TO_VIRT(PTE_ADDR(pdpte));
+                pgdir_t *pd = PHYS_TO_VIRT(PTE_ADDR(pdpte));
                 for (int pdei = 0; pdei < 512; pdei++)
                 {
-                    pte_t pte = pgdir->entries[pdei];
-                    if (!(pte & PTE_PRESENT))
+                    pte_t pde = pd->entries[pdei];
+                    if (!(pde & PTE_PRESENT))
                         continue;
 
-                    if (pte & PTE_ALLOC)
-                        frame_free(PTE_ADDR(pte));
+                    if (!(pde & PTE_PAGE_SIZE))
+                    {
+                        pgtbl_t *pt = PHYS_TO_VIRT(PTE_ADDR(pde));
+                        for (int ptei = 0; ptei < 512; ptei++)
+                        {
+                            pte_t pte = pt->entries[ptei];
+                            if (!(pte & PTE_PRESENT))
+                                continue;
+
+                            if (pte & PTE_ALLOC)
+                                frame_free(PTE_ADDR(pte));
+                        }
+
+                        frame_free(PTE_ADDR(pde));
+                    }
                 }
 
                 frame_free(PTE_ADDR(pdpte));
