@@ -8,6 +8,9 @@
 #define PTE_WRITEABLE (1ull << 1)
 #define PTE_USER      (1ull << 2)
 #define PTE_PAGE_SIZE (1ull << 7)
+// Custom bit - used to mark physical frames that have been allocated by vmem_alloc_pages
+// (i.e. must be freed when vmem is destroyed)
+#define PTE_ALLOC     (1ull << 10)
 
 #define PTE_FLAGS_MASK ((1ull << 12) - 1)
 #define PTE_ADDR_MASK  ((1ull << 48) - 1)

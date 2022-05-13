@@ -164,21 +164,15 @@ int arch_thread_new(arch_thread_t* th, arch_regs_t** result_regs)
 
 int arch_thread_clone(arch_thread_t* dst, arch_regs_t** regs, arch_thread_t* src)
 {
-    UNUSED(src);
+    UNUSED(regs);
 
     int err = allocate_kstack(dst);
     if (err < 0)
         return err;
 
-    uint8_t* kstack_top = dst->kstack_top;
-    kstack_top -= sizeof(arch_regs_t);
-    if (regs != NULL)
-        *regs = (arch_regs_t*)kstack_top;
-
-    kstack_top -= sizeof(on_stack_context_t);
-    on_stack_context_t* onstack_ctx = (on_stack_context_t*)kstack_top;
-    onstack_ctx->ret_addr = (uint64_t)pop_and_iret;
-    dst->context.rsp = (uint64_t)kstack_top;
+    // Copy stack contents
+    memcpy(dst->kstack_top, src->kstack_top, PAGE_SIZE);
+    dst->context.rsp -= (uint64_t)src->kstack_top - src->context.rsp;
     return 0;
 }
 

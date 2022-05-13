@@ -100,7 +100,7 @@ section .text
 
         ; Restore user-space rsp.
         mov rsp, qword [saved_rsp]
-        sysret
+        o64 sysret
 
     global pop_and_iret
     pop_and_iret:

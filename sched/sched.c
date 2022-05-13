@@ -10,6 +10,8 @@
 
 #define PREEMPT_TICKS 10
 
+uint64_t sched_timer = 0;
+
 task_t tasks[MAX_TASK_COUNT] = {};
 extern void jump_userspace();
 
@@ -50,22 +52,9 @@ static int setup_vmem(vmem_t* vm)
     return 0;
 }
 
-static task_t* allocate_task()
-{
-    uint64_t curr_pid = 1;
-    while (tasks[curr_pid].state != TASK_NOT_ALLOCATED && curr_pid < MAX_TASK_COUNT)
-        curr_pid++;
-
-    if (curr_pid == MAX_TASK_COUNT)
-        return NULL;
-
-    tasks[curr_pid].pid = curr_pid;
-    return &tasks[curr_pid];
-}
-
 static int setup_init_task()
 {
-    task_t* new_task = allocate_task();
+    task_t* new_task = sched_allocate_task();
     if (new_task == NULL)
         return -ENOMEM;
 
@@ -98,7 +87,10 @@ static vmem_t sched_vmem = {};
 
 static void sched_switch_to(task_t* next)
 {
-    _current = next;
+    sched_current() = next;
+    // Set CPU time dealdline for the task
+    sched_current()->preempt_deadline = sched_timer + PREEMPT_TICKS;
+
     vmem_switch_to(&next->vmem);
     arch_thread_switch(&sched_context, &next->arch_thread);
 }
@@ -118,12 +110,23 @@ void sched_start()
         bool found = false;
         for (size_t i = 0; i < MAX_TASK_COUNT; i++)
         {
+            // Make sleeping task runnable again if it's time
+            if (tasks[i].state == TASK_SLEEPING && sched_timer >= tasks[i].sleep_until)
+                tasks[i].state = TASK_RUNNABLE;
+
             if (tasks[i].state == TASK_RUNNABLE)
             {
                 // We found running task, switch to it.
                 sched_switch_to(&tasks[i]);
                 found = 1;
                 // We've returned to the scheduler.
+
+                if (tasks[i].state == TASK_ZOMBIE)
+                {
+                    // Free resources occupied by dying task
+                    vmem_destroy(&tasks[i].vmem);
+                    arch_thread_destroy(&tasks[i].arch_thread);
+                }
             }
         }
 
@@ -145,16 +148,18 @@ void sched_switch()
 
 void sched_timer_tick()
 {
+    sched_timer++;
+
     // Return if we are not in user task now
     if (!_current)
         return;
 
     // We should switch task after some timer ticks
-    sched_current()->ticks++;
-    if (sched_current()->ticks >= PREEMPT_TICKS)
+    if (sched_current()->preempt_deadline >= sched_timer)
     {
-        sched_current()->ticks = 0;
+        // Task CPU time exceeded - switch to others
         sched_switch();
+        // Returned to this task at the moment
     }
 }
 
@@ -163,24 +168,15 @@ void sched_yield()
     panic_on_reach();
 }
 
-int64_t sys_getpid(arch_regs_t* regs)
+task_t* sched_allocate_task()
 {
-    UNUSED(regs);
-    return _current->pid;
-}
+    uint64_t curr_pid = 1;
+    while (tasks[curr_pid].state != TASK_NOT_ALLOCATED && curr_pid < MAX_TASK_COUNT)
+        curr_pid++;
 
-int64_t sys_fork(arch_regs_t* parent_regs)
-{
-    // TODO: implement me.
-    (void)parent_regs;
-    panic_on_reach();
-    return -1;
-}
+    if (curr_pid == MAX_TASK_COUNT)
+        return NULL;
 
-_Noreturn int64_t sys_exit(arch_regs_t* regs)
-{
-    // TODO: implement me.
-    (void)regs;
-    panic_on_reach();
-    while (true);
+    tasks[curr_pid].pid = curr_pid;
+    return &tasks[curr_pid];
 }

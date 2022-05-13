@@ -1,11 +1,12 @@
-#include "drivers/apic.h"
-#include "kernel/panic.h"
-#include "kernel/irq.h"
-#include "arch/x86/x86.h"
-#include "mm/paging.h"
+#include <drivers/apic.h>
+#include <kernel/panic.h>
+#include <kernel/irq.h>
+#include <arch/x86/x86.h>
+#include <mm/paging.h>
+#include <sched/sched.h>
 
 // APIC timer period in milliseconds
-#define APIC_TIMER_PERIOD 1
+#define APIC_TIMER_PERIOD SCHED_TIMER_PERIOD
 
 // APIC callibration period in milliseconds
 #define CALLIBRATE_PERIOD 10
