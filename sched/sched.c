@@ -111,7 +111,7 @@ void sched_start()
 
     vmem_init_from_current(&sched_vmem);
 
-    // irq_enable();
+    irq_enable();
 
     for (;;)
     {

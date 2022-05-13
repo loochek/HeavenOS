@@ -27,8 +27,7 @@ USER_CODE_SEG:   equ (4 << 3) | RPL_RING3
     push r15
 %endmacro
 
-; params: pop_rax
-%macro POP_REGS 1
+%macro POP_REGS 0
     pop r15
     pop r14
     pop r13
@@ -43,10 +42,7 @@ USER_CODE_SEG:   equ (4 << 3) | RPL_RING3
     pop rdx
     pop rcx
     pop rbx
-%if %1
     pop rax
-%endif
-    add rsp, 8
 %endmacro
 
 section .bss
@@ -75,6 +71,7 @@ section .text
         ; We have a reliable stack now, enable interrupts.
         sti
 
+        ; Construct arch_regs_t
         ; ss
         push qword USER_DATA_SEG
         ; rsp
@@ -86,6 +83,8 @@ section .text
         ; rip
         push rcx
         ; errcode
+        push qword 0
+        ; irq_num
         push qword 0
         ; General purpose registers
         PUSH_REGS
@@ -101,12 +100,11 @@ section .text
 
         ; Restore user-space rsp.
         mov rsp, qword [saved_rsp]
-
-        sysretq
+        sysret
 
     global pop_and_iret
     pop_and_iret:
         POP_REGS
-        ; Skip error code.
-        add rsp, 8
+        ; Skip error code and IRQ number
+        add rsp, 16
         iretq

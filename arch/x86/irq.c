@@ -33,10 +33,10 @@ static const char *exc_names[] =
 
 static void timer_handler();
 static void spurious_handler();
-static void dump(struct irqctx* ctx);
+static void dump(arch_regs_t* ctx);
 static const char *get_irq_name(int irq_num);
 
-void irq_handler(struct irqctx* ctx)
+void irq_handler(arch_regs_t* ctx)
 {
     if (ctx->irq_num == IRQ_PF)
     {
@@ -72,7 +72,7 @@ static void spurious_handler()
     apic_eoi();
 }
 
-static void dump(struct irqctx* ctx)
+static void dump(arch_regs_t* ctx)
 {
     printk("Unhandled IRQ %d [%s]\n", ctx->irq_num, get_irq_name(ctx->irq_num));
     printk("Error code: %d\n", ctx->errcode);
@@ -88,9 +88,9 @@ static void dump(struct irqctx* ctx)
            "R12: 0x%x R13: 0x%x\n"
            "R14: 0x%x R15: 0x%x\n"
            "RIP: 0x%x CS: 0x%x\n",
-           ctx->reg_rax, ctx->reg_rbx, ctx->reg_rcx, ctx->reg_rdx, ctx->reg_rsi, ctx->reg_rdi, ctx->reg_r8,
-           ctx->reg_r9, ctx->reg_r10, ctx->reg_r11, ctx->reg_r12, ctx->reg_r13, ctx->reg_r14, ctx->reg_r15,
-           ctx->reg_rip, ctx->reg_cs);
+           ctx->rax, ctx->rbx, ctx->rcx, ctx->rdx, ctx->rsi, ctx->rdi, ctx->r8,
+           ctx->r9, ctx->r10, ctx->r11, ctx->r12, ctx->r13, ctx->r14, ctx->r15,
+           ctx->rip, ctx->cs);
 }
 
 static const char *get_irq_name(int irq_num)

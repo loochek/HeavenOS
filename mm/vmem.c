@@ -190,7 +190,7 @@ int vmem_map_page(vmem_t* vm, void* virt_addr, void* frame, uint64_t flags)
     if (pgdir == NULL)
         return -ENOMEM;
 
-    pgtbl_t* pgtbl = vmem_ensure_next_table(pgdir->entries, PDPE_FROM_ADDR(virt_addr), flags);
+    pgtbl_t* pgtbl = vmem_ensure_next_table(pgdir->entries, PDE_FROM_ADDR(virt_addr), flags);
     if (pgtbl == NULL)
         return -ENOMEM;
 
@@ -243,7 +243,7 @@ bool vmem_handle_pf(void* fault_addr)
     if (!area)
         return false;
 
-    void* frame = frame_alloc();
+    void* frame = VIRT_TO_PHYS(frame_alloc());
     if (!frame)
         panic("Can't map page: out of memory");
 

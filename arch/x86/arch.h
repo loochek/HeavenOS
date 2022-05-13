@@ -5,7 +5,7 @@
 #include <arch/x86/context_switch.h>
 #include <arch/x86/syscall.h>
 
-typedef struct
+typedef struct __attribute__((packed))
 {
     uint64_t r15;
     uint64_t r14;
@@ -22,12 +22,18 @@ typedef struct
     uint64_t rcx;
     uint64_t rbx;
     uint64_t rax;
+    uint64_t irq_num;
+    // Hardware IRQ stack frame
     uint64_t errcode;
     uint64_t rip;
-    uint64_t cs;
+    uint16_t cs;
+    uint16_t __pad1;
+    uint32_t __pad2;
     uint64_t rflags;
     uint64_t rsp;
-    uint64_t ss;
+    uint16_t ss;
+    uint16_t __pad3;
+    uint32_t __pad4;
 } arch_regs_t;
 
 #define arch_regs_set_retval(regs, retval) (regs)->rax = (retval)

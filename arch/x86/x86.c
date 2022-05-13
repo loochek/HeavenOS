@@ -147,12 +147,10 @@ int arch_thread_new(arch_thread_t* th, arch_regs_t** result_regs)
     uint8_t* kstack_top = th->kstack_top;
     kstack_top -= sizeof(arch_regs_t);
     arch_regs_t* regs = (arch_regs_t*)kstack_top;
-    regs->rsp = 0x70000000 + 4*PAGE_SIZE;
+    regs->rsp = 0x70000000 + 4 * PAGE_SIZE;
     regs->ss = GDT_SEGMENT_SELECTOR(USER_DATA_SEG, RPL_RING3);
-    // regs->ss = GDT_SEGMENT_SELECTOR(KERNEL_DATA_SEG, RPL_RING0);
     regs->rip = (uint64_t)user_program;
     regs->cs = GDT_SEGMENT_SELECTOR(USER_CODE_SEG, RPL_RING3);
-    // regs->cs = GDT_SEGMENT_SELECTOR(KERNEL_CODE_SEG, RPL_RING0);
     regs->rflags = RFLAGS_IF;
     if (result_regs != NULL)
         *result_regs = regs;
