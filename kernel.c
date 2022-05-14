@@ -3,6 +3,9 @@
 #include "console.h"
 #include "printk.h"
 #include "panic.h"
+#include "acpi.h"
+#include "apic.h"
+#include "irq.h"
 
 void dump_memmap()
 {
@@ -45,14 +48,22 @@ void dump_memmap()
 
 void kmain()
 {
+    irq_init();
     mb_parse_boot_info();
     fb_init(mb_fb_info);
     cons_init();
 
-    printk("HeavenOS\n");
+    printk("HeavenOS version %s\n", HEAVENOS_VERSION);
+    acpi_init();
+    apic_init();
+    apic_setup_timer();
 
     dump_memmap();
     printk("\n\n\n\n");
+
+    irq_enable();
+
+    //*(volatile int*)(-1) = 0xDEAD;
 
     panic("manually initiated %s", "panic");
 }

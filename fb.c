@@ -16,7 +16,7 @@ static void fb_put_rect_fragment(fb_color_t color, int x, int y, int width);
 
 void fb_init()
 {
-    kassert(mb_fb_info != NULL && mb_fb_info->type == 1 || mb_fb_info->depth == 32);
+    kassert(mb_fb_info != NULL && mb_fb_info->type == 1 && mb_fb_info->depth == 32);
 
     fb_width  = mb_fb_info->width;
     fb_height = mb_fb_info->heigth;
@@ -90,7 +90,7 @@ void fb_scroll_up(int height, fb_color_t color)
 {
     kassert(fb_initialized);
 
-    memmove(fb_addr, fb_addr + fb_pitch * height, fb_pitch * (fb_height - height) * sizeof(fb_color_t));
+    memmove(fb_addr, fb_addr + fb_pitch * height, fb_pitch * (fb_height - height));
     for (int y = fb_height - height; y < fb_height; y++)
         fb_put_rect_fragment(color, 0, y, fb_width);
 }
