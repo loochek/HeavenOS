@@ -164,15 +164,13 @@ int arch_thread_new(arch_thread_t* th, arch_regs_t** result_regs)
 
 int arch_thread_clone(arch_thread_t* dst, arch_regs_t** regs, arch_thread_t* src)
 {
-    UNUSED(regs);
-
     int err = allocate_kstack(dst);
     if (err < 0)
         return err;
 
-    // Clone stack contents (arch_regs_t is already on src kstack)
-    memcpy(dst->kstack_top - PAGE_SIZE, src->kstack_top - PAGE_SIZE, PAGE_SIZE);
-    dst->context.rsp = (uint64_t)(dst->kstack_top - ((uint64_t)src->kstack_top - src->context.rsp));
+    // Copy arch_regs_t from src's kstack
+    dst->context.rsp = (uint64_t)(dst->kstack_top - sizeof(arch_regs_t));
+    memcpy((void*)dst->context.rsp, src->kstack_top - sizeof(arch_regs_t), sizeof(arch_regs_t));
 
     if (regs != NULL)
         *regs = (arch_regs_t*)dst->context.rsp;

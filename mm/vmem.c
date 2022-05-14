@@ -10,7 +10,6 @@ static vmem_t *curr_vmem = NULL;
 
 static uint64_t vmem_convert_flags(uint64_t flags);
 static uint64_t vmem_unconvert_flags(uint64_t flags);
-static vmem_area_t *vmem_is_mapped(vmem_t* vm, uint64_t addr);
 static bool vmem_intersects(vmem_t* vm, uint64_t other_start_addr, uint64_t other_size);
 static void vmem_unmap_page (vmem_t* vm, void* virt_addr);
 static void* vmem_ensure_next_table(pte_t* tbl, size_t idx, uint64_t raw_flags);
@@ -66,7 +65,6 @@ void vmem_free_pages(vmem_t* vm, void* virt_addr, size_t pgcnt)
         vmem_unmap_page(vm, (void*)addr);
 }
 
-// TODO: check
 int vmem_init(vmem_t* vm)
 {
     vm->pml4 = frame_alloc();
@@ -95,7 +93,6 @@ int vmem_init_from_current(vmem_t* vm)
     return 0;
 }
 
-// TODO: check
 int vmem_clone(vmem_t* dst, vmem_t* src)
 {
     int res = vmem_init(dst);
@@ -134,11 +131,12 @@ void vmem_switch_to(vmem_t* vm)
     curr_vmem = vm;
 }
 
-// TODO: seems to be correct - check
 void vmem_destroy(vmem_t* vm)
 {
+    kassert(curr_vmem != vm);
+    
     // Free areas list
-    while (list_empty(&vm->areas_list->node))
+    while (!list_empty(&vm->areas_list->node))
     {
         list_node_t *to_pop = vm->areas_list->node.next;
         list_extract(to_pop);
@@ -188,8 +186,8 @@ void vmem_destroy(vmem_t* vm)
                         continue;
 
                     // Free page if it's marked as allocated by vmem_alloc_pages
-                    if (pte & VMEM_ALLOC)
-                        frame_free(PHYS_TO_VIRT(PTE_ADDR(pte)));
+                    // if (pte & PTE_ALLOC)
+                    //     frame_free(PHYS_TO_VIRT(PTE_ADDR(pte)));
                 }
 
                 frame_free(pt);
@@ -266,9 +264,24 @@ int vmem_map_page_1gb(vmem_t* vm, void* virt_addr, void* frame, uint64_t flags)
     return 0;
 }
 
+vmem_area_t *vmem_is_mapped(vmem_t* vm, void* addr)
+{
+    list_node_t *area_node = vm->areas_list->node.next;
+    while (area_node != &vm->areas_list->node)
+    {
+        vmem_area_t *area = (vmem_area_t*)area_node;
+        if (area->start <= (uint64_t)addr && (uint64_t)addr < area->start + area->size * PAGE_SIZE)
+            return area;
+
+        area_node = area_node->next;
+    }
+
+    return NULL;
+}
+
 bool vmem_handle_pf(void* fault_addr)
 {
-    vmem_area_t *area = vmem_is_mapped(curr_vmem, (uint64_t)fault_addr);
+    vmem_area_t *area = vmem_is_mapped(curr_vmem, fault_addr);
     if (!area)
         return false;
 
@@ -311,21 +324,6 @@ static uint64_t vmem_unconvert_flags(uint64_t flags)
         vmem_flags |= VMEM_ALLOC;
 
     return vmem_flags;
-}
-
-static vmem_area_t *vmem_is_mapped(vmem_t* vm, uint64_t addr)
-{
-    list_node_t *area_node = vm->areas_list->node.next;
-    while (area_node != &vm->areas_list->node)
-    {
-        vmem_area_t *area = (vmem_area_t*)area_node;
-        if (area->start <= addr && addr < area->start + area->size * PAGE_SIZE)
-            return area;
-
-        area_node = area_node->next;
-    }
-
-    return NULL;
 }
 
 static bool vmem_intersects(vmem_t* vm, uint64_t other_start_addr, uint64_t other_size)
@@ -391,10 +389,8 @@ static void* vmem_ensure_next_table(pte_t* tbl, size_t idx, uint64_t raw_flags)
     return next_tbl;
 }
 
-/// TODO: check
 static int vmem_clone_pages(vmem_t* dst, pml4_t* src_pml4)
 {
-    printk("vmem_clone_pages: start\n");
     for (size_t pml4ei = 0; pml4ei < 512; pml4ei++)
     {
         pte_t pml4e = src_pml4->entries[pml4ei];
@@ -480,7 +476,6 @@ static int vmem_clone_pages(vmem_t* dst, pml4_t* src_pml4)
             }
         }
     }
-
-    printk("vmem_clone_pages: successful finish\n");
+    
     return 0;
 }

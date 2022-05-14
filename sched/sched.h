@@ -58,10 +58,6 @@ void sched_switch();
 void sched_timer_tick();
 
 /**
- */
-void sched_yield();
-
-/**
  * Allocates task entry
  * 
  * \return Task entry

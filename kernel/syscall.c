@@ -91,27 +91,43 @@ static _Noreturn int64_t sys_exit(arch_regs_t* regs)
 
 static int64_t sys_wait(arch_regs_t* regs)
 {
-    size_t pid = syscall_arg0(regs);
-    if (tasks[pid].ppid != sched_current()->pid)
+    size_t child_pid = syscall_arg0(regs);
+    if (tasks[child_pid].ppid != sched_current()->pid)
         return -ECHILD;
 
-    if (tasks[pid].state != TASK_ZOMBIE)
+    if (tasks[child_pid].state != TASK_ZOMBIE)
     {
         // Child is not dead yet
         // Go back to scheduler
         sched_current()->state = TASK_WAITING;
-        sched_current()->wait_pid = pid;
+        sched_current()->wait_pid = child_pid;
         sched_switch();
 
         // Returned to this task - child must me zombie at the moment
-        kassert_dbg(tasks[pid].state == TASK_ZOMBIE);
+        kassert_dbg(tasks[child_pid].state == TASK_ZOMBIE);
     }
 
-    /// TODO: check status to be writeable by user
     int* status = (int*)syscall_arg1(regs);
-    *status = tasks[pid].exitcode;
+    if (status != NULL)
+    {
+        vmem_area_t *area = vmem_is_mapped(&sched_current()->vmem, status);
+        if (area == NULL || (area->flags & (VMEM_USER | VMEM_WRITE)) == 0)
+        {
+            printk("sys_wait: status addr is not valid - terminating pid %d\n", sched_current()->pid);
+            sched_current()->exitcode = -EINVAL;
+            sched_current()->state = TASK_ZOMBIE;
+
+            // Go to scheduler
+            sched_switch();
+            // Scheduler mustn't schedule this task anymore
+            panic_on_reach();
+        }
+
+        *status = tasks[child_pid].exitcode;
+    }
 
     // Free task entry
-    tasks[pid].state = TASK_NOT_ALLOCATED;
+    tasks[child_pid].state = TASK_NOT_ALLOCATED;
+    printk("sys_wait: pid %d reaped child with pid %d\n", sched_current()->pid, child_pid);
     return 0;
 }

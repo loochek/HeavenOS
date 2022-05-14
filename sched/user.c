@@ -1,11 +1,12 @@
-#include <stdint.h>
+#include <common.h>
+#include <mm/mem_layout.h>
 #include <kernel/syscall.h>
 
 #define USER_TEXT __attribute__((section(".user.text,\"ax\",@progbits#")))
 
 #define SYSCALL0(n, res) __asm__ volatile ("syscall" : "=a"(res) : "a"(n) : "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11", "memory" )
 #define SYSCALL1(n, arg0, res) __asm__ volatile ("syscall" : "=a"(res) : "a"(n), "D"(arg0) : "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11", "memory" )
-#define SYSCALL2(n, arg0, arg1, res) __asm__ volatile ("syscall" :  "=a(res)": "a"(n), "D"(arg0), "S"(arg1) : "rdx", "rcx", "r8", "r9", "r10", "r11", "memory" )
+#define SYSCALL2(n, arg0, arg1, res) __asm__ volatile ("syscall" :  "=a"(res): "a"(n), "D"(arg0), "S"(arg1) : "rdx", "rcx", "r8", "r9", "r10", "r11", "memory" )
 
 USER_TEXT int64_t getpid()
 {
@@ -35,19 +36,26 @@ USER_TEXT int64_t exit(uint64_t arg)
     return res;
 }
 
+USER_TEXT int64_t wait(uint64_t pid, int* status)
+{
+    int64_t res;
+    SYSCALL2(SYS_WAIT, pid, status, res);
+    return res;
+}
+
 USER_TEXT int main()
 {
-    int64_t pid = getpid();
-
-    int err = fork();
-    if (err < 0) {
+    int child_pid = fork();
+    if (child_pid < 0) {
         return -1;
     }
 
-    if (err == 0) {
-        sleep(getpid());
+    if (child_pid == 0) {
+        sleep(4000);
     } else {
-        sleep(pid);
+        sleep(2000);
+        int status = 0;
+        wait(child_pid, &status);
     }
 
     return 0;

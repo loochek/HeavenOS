@@ -129,6 +129,16 @@ int vmem_map_page_1gb(vmem_t* vm, void* virt_addr, void* frame, uint64_t flags);
 void vmem_destroy(vmem_t* vm);
 
 /**
+ * Checks virtual address to be mapped in given address space
+ * 
+ * \param vm Address space
+ * \param addr Address
+ * 
+ * \return Memory area corresponding to address or NULL
+ */
+vmem_area_t *vmem_is_mapped(vmem_t* vm, void* addr);
+
+/**
  * Page fault handler for on-demand allocation
  * 
  * \param fault_addr Fault address

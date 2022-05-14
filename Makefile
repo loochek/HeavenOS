@@ -18,7 +18,7 @@ endif
 export
 
 QEMU=qemu-system-x86_64
-QEMUFLAGS=-cdrom kernel.iso -monitor stdio
+QEMUFLAGS=-cdrom kernel.iso -monitor stdio -m 2G
 
 ifdef EFI
 QEMUFLAGS+=-bios /usr/share/OVMF/x64/OVMF.fd
