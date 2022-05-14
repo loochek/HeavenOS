@@ -7,7 +7,7 @@
 #include <mm/vmem.h>
 
 // Timer period in milliseconds
-#define SCHED_TIMER_PERIOD 1
+#define SCHED_TIMER_PERIOD 10
 
 #define MAX_TASK_COUNT (1 << 16)
 
