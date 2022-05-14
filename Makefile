@@ -1,23 +1,27 @@
+SHELL := /bin/bash
+
 AS=nasm
 CC=x86_64-elf-gcc
-LD=x86_64-elf-gcc
-
-AS_FLAGS=-f elf64 -g -F dwarf
-CC_FLAGS=-mno-mmx -mno-sse -mno-sse2 -fno-pie -g -mno-red-zone -std=gnu99 -ffreestanding -nostdlib -O2 -Wall -Wextra -Werror -fno-stack-protector
-LD_FLAGS=-ffreestanding -O2 -no-pie -nostdlib -fno-stack-protector
-
-OBJCOPY=objcopy
+LD=x86_64-elf-ld
+OBJCOPY=x86_64-elf-objcopy
 GRUB_MKRESCUE=grub-mkrescue
 
-QEMU=qemu-system-x86_64
-QEMU_FLAGS=-cdrom kernel.iso -monitor stdio -accel kvm
+ROOT=$(shell pwd)
+ASFLAGS=-f elf64 -F dwarf -g
+CCFLAGS=-I$(ROOT) -mno-mmx -mno-sse -mno-sse2 -maddress-mode=long -mcmodel=kernel -g -m64 -mno-red-zone -ffreestanding -fno-common -Wall -Wextra -Werror -nostdlib
+LDFLAGS=-nostdlib --no-dynamic-linker --warn-constructors --warn-common --no-eh-frame-hdr
 
 ifndef RELEASE
-CC_FLAGS+=-DQEMU_PIT_HACK
+CCFLAGS+=-DQEMU_PIT_HACK
 endif
 
+export
+
+QEMU=qemu-system-x86_64 -m 2G
+QEMUFLAGS=-cdrom kernel.iso -monitor stdio
+
 ifdef EFI
-QEMU_FLAGS+=-bios /usr/share/OVMF/x64/OVMF.fd
+QEMUFLAGS+=-bios /usr/share/OVMF/x64/OVMF.fd
 endif
 
 kernel.iso: kernel.bin
@@ -27,20 +31,31 @@ kernel.iso: kernel.bin
 	$(GRUB_MKRESCUE) -o kernel.iso isodir
 	rm -rf isodir
 
-%.o: %.c
-	$(CC) $(CC_FLAGS) -c -o $@ $<
-
-%.o: %.asm
-	$(AS) $(AS_FLAGS) -o $@ $<
-
-kernel.bin: boot.o common.o kernel.o multiboot.o fb.o console.o printk.o panic.o acpi.o apic.o irq.o irq_asm.o
-	$(LD) $(LD_FLAGS) -T linker.ld -z max-page-size=4096 -o $@ $^
+kernel.bin:
+	$(MAKE) -C boot/
+	$(MAKE) -C drivers/
+	$(MAKE) -C kernel/
+	$(MAKE) -C mm/
+	$(MAKE) -C utils/
+	$(LD) $(LDFLAGS) -T <(cpp -P -E linker.ld) -z max-page-size=4096 `find $(ROOT) -name '*.o'` -o kernel.bin
+	$(OBJCOPY) --only-keep-debug kernel.bin kernel.sym
+	$(OBJCOPY) --strip-debug kernel.bin
 
 qemu: kernel.iso
-	$(QEMU) $(QEMU_FLAGS)
+	$(QEMU) $(QEMUFLAGS)
 
 qemu-gdb: kernel.iso
-	$(QEMU) $(QEMU_FLAGS) -s -S
+	$(QEMU) $(QEMUFLAGS) -s -S
 
 clean:
-	rm -f *.o kernel.bin kernel.iso
+	$(MAKE) -C boot/ clean
+	$(MAKE) -C drivers/ clean
+	$(MAKE) -C kernel/ clean
+	$(MAKE) -C mm/ clean
+	$(MAKE) -C utils/ clean
+	rm -f kernel.bin
+	rm -f kernel.sym
+	rm -f kernel.iso
+
+.PHONY: kernel.bin clean
+

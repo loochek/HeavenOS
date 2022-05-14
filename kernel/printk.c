@@ -1,6 +1,6 @@
-#include "panic.h"
-#include "printk.h"
-#include "console.h"
+#include "kernel/panic.h"
+#include "kernel/printk.h"
+#include "kernel/console.h"
 
 enum { PRINTK_BUF_SIZE = 11 };
 static const char digits[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};

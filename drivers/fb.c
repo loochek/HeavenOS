@@ -1,6 +1,7 @@
-#include "panic.h"
-#include "multiboot.h"
-#include "fb.h"
+#include "kernel/panic.h"
+#include "kernel/multiboot.h"
+#include "drivers/fb.h"
+#include "mm/paging.h"
 
 bool fb_initialized = false;
 
@@ -20,7 +21,7 @@ void fb_init()
 
     fb_width  = mb_fb_info->width;
     fb_height = mb_fb_info->heigth;
-    fb_addr   = mb_fb_info->addr;
+    fb_addr   = PHYS_TO_VIRT(mb_fb_info->addr);
     fb_pitch  = mb_fb_info->pitch;
 
     fb_buf_size = mb_fb_info->pitch * fb_height;

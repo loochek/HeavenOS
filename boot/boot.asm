@@ -1,12 +1,6 @@
-MB_MAGIC: equ 0xE85250D6
-MB_ARCH:  equ 0
+%include "multiboot.asm"
 
-MB_TAG_END: equ 0
-MB_TAG_FB:  equ 5
-
-FB_PREFFERED_WIDTH:  equ 1280
-FB_PREFFERED_HEIGHT: equ 720
-FB_PREFFERED_DEPTH:  equ 32
+KERNEL_DIRECT_PHYS_MAPPING_START: equ 0xffff888000000000
 
 PTE_P:   equ 0x001   ; Present
 PTE_W:   equ 0x002   ; Writeable
@@ -29,77 +23,40 @@ GDT_RW: equ 1 << 9
 GDT_KERNEL_CODE64_SELECTOR: equ 0x8
 GDT_KERNEL_DATA64_SELECTOR: equ 0x10
 
-; .multiboot section defines Multiboot 2 compatible header.
-section .multiboot
-    .header_start:
-    ; Header magic fields
-        align 8
-        dd MB_MAGIC
-        dd MB_ARCH
-        dd .header_end - .header_start ; Header length
-        dd -(MB_MAGIC + MB_ARCH + .header_end - .header_start)
-
-    ; Framebuffer tag
-        align 8
-        dw MB_TAG_FB
-        dw 0
-        dd 20
-        dd FB_PREFFERED_WIDTH
-        dd FB_PREFFERED_HEIGHT
-        dd FB_PREFFERED_DEPTH
-
-    ; End tag
-        align 8
-        dw MB_TAG_END
-        dw 0
-        dd 8
-
-    .header_end:
+PAGE_SIZE: equ 4096
 
 ; Kernel entry point code
-section .text
+section .early.text
     ; C code entry point
-    extern kmain 
+    extern early_init
 
-    ; _start is an entry point of our kernel, execution after bootloader starts here.
-    global _start
-    _start:
+    ; _early_entry_point is an entry point of our kernel, execution after bootloader starts here.
+    global _early_entry_point
+    _early_entry_point:
     ; Tell assembler, that we are running 32-bit protected mode.
     bits 32
    ; Save Multiboot boot info pointer
 
-        mov dword [mb_boot_info], ebx
-        mov dword [mb_boot_info + 4], 0
+        mov dword [mb_early_boot_info], ebx
+        mov dword [mb_early_boot_info + 4], 0
 
-   ; To enable long mode, we need to setup basic paging.
-   ; Here we setup identity mapping for the first 4 gigabytes.
+   ; To enable long mode, we need to setup early paging.
+   ; Here we setup identity mapping for the first gigabyte.
 
    ; PML4[0] = PDPT writable
-        mov edi, pml4
-        mov eax, pdpt
+        mov edi, early_pml4
+        mov eax, early_pdpt
         or eax, PTE_P | PTE_W
         mov dword [edi], eax
 
    ; PDPT[0] = 0 writable
-        mov edi, pdpt
+        mov edi, early_pdpt
         mov dword [edi], PTE_PS | PTE_P | PTE_W
-
-   ; PDPT[1] = 1GB writable
-        mov edi, pdpt + 8 * 1
-        mov dword [edi], 0x40000000 | PTE_PS | PTE_P | PTE_W
-
-   ; PDPT[2] = 2GB writable
-        mov edi, pdpt + 8 * 2
-        mov dword [edi], 0x80000000 | PTE_PS | PTE_P | PTE_W
-
-   ; PDPT[3] = 3GB writable
-        mov edi, pdpt + 8 * 3
-        mov dword [edi], 0xC0000000 | PTE_PS | PTE_P | PTE_W
 
    ; Enabling 64-bit mode is described in ISDM, Volume 3A, Section 9.8.5.
 
    ; Write PML4 physical address into CR3.
-        mov eax, pml4
+        mov eax, early_pml4
         mov cr3, eax
 
    ; Set PAE bit in CR4.
@@ -134,9 +91,9 @@ section .text
         mov fs, ax
         mov gs, ax
 
-   ; Setup simple stack and call kernel_main.
-        mov rsp, bootstack
-        call kmain
+   ; Setup simple stack and call early_init.
+        mov rsp, early_stack
+        call early_init
 
    ; Halt processor, i.e. put it in a such state that next instruction will be executed only after interrupt.
    ; Effectively it means inifinite non-busy loop.
@@ -144,7 +101,43 @@ section .text
         hlt
         jmp .loop
 
-section .data
+     extern kmain
+     extern kmain_return
+     extern early_data
+
+     global jump_to_kernel_main
+     jump_to_kernel_main:
+        ; Because KERNEL_DIRECT_PHYS_MAPPING_START is not representable as imm32, we need move it to register first.
+        mov rbx, KERNEL_DIRECT_PHYS_MAPPING_START
+
+        ; Reset to the same stack, but use its virtual address instead.
+        lea rsp, [early_stack]
+        add rsp, rbx
+
+        ; If kernel_main occasionally returns, kmain_return will be called.
+        lea rax, [kmain_return]
+        push rax
+
+        ; Fix GDT pointer
+        lea rax, [gdt64]
+        add rax, rbx
+        mov qword [gdt64_ptr + 2], rax
+        lgdt [gdt64_ptr]
+
+        ; Use lea to indicate that we want use imm64.
+        lea rax, [kmain]
+        lea rdi, [early_data]
+        add rdi, rbx
+        jmp rax
+
+     ; Called when kmain occasionally returns
+     ; Just halt
+     kmain_return:
+     .loop:
+        hlt
+        jmp .loop
+
+section .early.data
     ; Setup GDT for 64-bit mode.
     align 4096
     gdt64:
@@ -167,11 +160,15 @@ section .data
         dq gdt64
 
     ; Multiboot boot info pointer
-    global mb_boot_info
-    mb_boot_info: dq 0
+    global mb_early_boot_info
+    mb_early_boot_info: dq 0
 
-section .bss
-    align 4096
-    pml4:      resb 4096
-    pdpt:      resb 4096
-    bootstack: resb 4096
+section .early.bss
+    global early_pml4
+
+    align PAGE_SIZE
+    early_pml4:  resb PAGE_SIZE
+    early_pdpt:  resb PAGE_SIZE
+     
+    resb PAGE_SIZE * 4
+    early_stack:

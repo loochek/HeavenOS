@@ -57,12 +57,12 @@ void irq_init();
 
 static inline void irq_disable()
 {
-    asm volatile ("cli");
+    __asm__ volatile ("cli");
 }
 
 static inline void irq_enable()
 {
-    asm volatile ("sti");
+    __asm__ volatile ("sti");
 }
 
 #endif

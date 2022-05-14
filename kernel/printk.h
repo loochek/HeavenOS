@@ -2,7 +2,7 @@
 #define PRINTK_H
 
 #include "common.h"
-#include "fb.h"
+#include "drivers/fb.h"
 
 // Original implementation by @pixelindigo: https://github.com/carzil/KeltOS/blob/master/kernel/printk.c
 

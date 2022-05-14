@@ -2,11 +2,18 @@
 #define MULTIBOOT_H
 
 #include "common.h"
+#include "boot/early.h"
 
 #define MB_MEMMAP_TYPE_RAM       1
 #define MB_MEMMAP_TYPE_ACPI      3
 #define MB_MEMMAP_TYPE_HIBER     4
 #define MB_MEMMAP_TYPE_DEFECTIVE 5
+
+typedef struct __attribute__((packed)) mb_boot_info_header
+{
+    uint32_t total_size;
+    uint32_t reserved;
+} mb_boot_info_header_t;
 
 typedef struct __attribute__((packed)) mb_tag_header
 {
@@ -68,8 +75,10 @@ extern mb_rsdp_t        *mb_acpi_rsdp_v2;
 
 /**
  * Parses Multiboot boot information and fills global pointers
+ * 
+ * \param early_data Pointer to early boot info passed to the higher half kernel main
  */
-void mb_parse_boot_info();
+void mb_parse_boot_info(early_data_t *early_data);
 
 /**
  * Creates new iterator over memory map regions provided by bootloader. 
@@ -87,5 +96,10 @@ void mb_memmap_iter_init(mb_memmap_iter_t *it);
  * \param it Iterator
  */
 mb_memmap_entry_t *mb_memmap_iter_next(mb_memmap_iter_t *it);
+
+/**
+ * \return Memory region occupied by Multiboot boot info
+ */
+mem_region_t mb_memory_region();
 
 #endif

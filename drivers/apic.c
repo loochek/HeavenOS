@@ -1,7 +1,8 @@
-#include "apic.h"
-#include "panic.h"
-#include "irq.h"
-#include "x86.h"
+#include "drivers/apic.h"
+#include "kernel/panic.h"
+#include "kernel/irq.h"
+#include "arch/x86.h"
+#include "mm/paging.h"
 
 // APIC timer period in milliseconds
 #define APIC_TIMER_PERIOD 1
@@ -119,7 +120,7 @@ void apic_init()
     if (!header)
         panic("ACPI MADT not found!");
 
-    lapic_ptr = (volatile uint32_t*)(uint64_t)header->lapic_addr;
+    lapic_ptr = (volatile uint32_t*)PHYS_TO_VIRT(header->lapic_addr);
     
     madt_entry_t* entry = &header->first_entry;
 
@@ -170,6 +171,8 @@ void apic_init()
 
 void apic_setup_timer()
 {
+    kassert(lapic_ptr != NULL);
+    
     // Setup APIC timer for callibration
     lapic_write(APIC_LVT_TMR, IRQ_TIMER);
     lapic_write(APIC_TMRDIV, TMR_DIV_X1);

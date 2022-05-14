@@ -1,7 +1,7 @@
 #ifndef APIC_H
 #define APIC_H
 
-#include "acpi.h"
+#include "drivers/acpi.h"
 
 /**
  * Initializes APIC. 

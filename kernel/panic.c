@@ -1,6 +1,6 @@
-#include "panic.h"
-#include "console.h"
-#include "printk.h"
+#include "kernel/panic.h"
+#include "kernel/console.h"
+#include "kernel/printk.h"
 
 void __panic(const char* location, const char* fmt, ...)
 {
@@ -17,5 +17,5 @@ void __panic(const char* location, const char* fmt, ...)
     }
 
     while (true)
-        asm volatile("hlt");
+        __asm__ volatile("hlt");
 }

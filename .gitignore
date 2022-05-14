@@ -2,4 +2,7 @@
 *.o
 *.bin
 *.iso
+*.sym
+*.log
 .directory
+bochs*
