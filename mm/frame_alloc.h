@@ -16,7 +16,8 @@ void frame_alloc_init();
 void* frames_alloc(size_t size);
 
 /**
- * Allocates single physical frame.
+ * Allocates single physical frame. 
+ * \return Direct-mapping virtual address of the allocated frame
  */
 void* frame_alloc();
 

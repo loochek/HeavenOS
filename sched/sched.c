@@ -91,6 +91,7 @@ static void sched_switch_to(task_t* next)
     // Set CPU time dealdline for the task
     sched_current()->preempt_deadline = sched_timer + PREEMPT_TICKS;
 
+    printk("sched_switch_to: pid %d\n", next->pid);
     vmem_switch_to(&next->vmem);
     arch_thread_switch(&sched_context, &next->arch_thread);
 }
@@ -117,6 +118,7 @@ void sched_start()
             if (tasks[i].state == TASK_RUNNABLE)
             {
                 // We found running task, switch to it.
+                // printk("Sched: switch to pid %d\n", tasks[i].pid);
                 sched_switch_to(&tasks[i]);
                 found = 1;
                 // We've returned to the scheduler.
@@ -154,13 +156,14 @@ void sched_timer_tick()
     if (!_current)
         return;
 
-    // We should switch task after some timer ticks
-    if (sched_current()->preempt_deadline >= sched_timer)
-    {
-        // Task CPU time exceeded - switch to others
-        sched_switch();
-        // Returned to this task at the moment
-    }
+    // // We should switch task after some timer ticks
+    // if (sched_current()->preempt_deadline >= sched_timer)
+    // {
+    //     printk("sched: deadline for pid %d\n", sched_current()->pid);
+    //     // Task CPU time exceeded - switch to others
+    //     sched_switch();
+    //     // Returned to this task at the moment
+    // }
 }
 
 void sched_yield()

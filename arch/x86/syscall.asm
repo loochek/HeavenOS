@@ -27,7 +27,8 @@ USER_CODE_SEG:   equ (4 << 3) | RPL_RING3
     push r15
 %endmacro
 
-%macro POP_REGS 0
+; args: restore_rax=true
+%macro POP_REGS 0-1 1
     pop r15
     pop r14
     pop r13
@@ -42,7 +43,12 @@ USER_CODE_SEG:   equ (4 << 3) | RPL_RING3
     pop rdx
     pop rcx
     pop rbx
+
+%if %1
     pop rax
+%else
+    add rsp, 8
+%endif
 %endmacro
 
 section .bss
@@ -71,7 +77,7 @@ section .text
         ; We have a reliable stack now, enable interrupts.
         sti
 
-        ; Construct arch_regs_t
+        ; Save task state (arch_regs_t) on the stack
         ; ss
         push qword USER_DATA_SEG
         ; rsp
@@ -94,17 +100,30 @@ section .text
         mov rsi, rsp
 
         call do_syscall
-        ; Return value in rax
-        ; Note that caller-saved registers are not affected at all (as do_syscall respects the ABI)
-        ; (only rsp, but it's restored on the next line)
 
-        ; Restore user-space rsp.
-        mov rsp, qword [saved_rsp]
+        ; Restore task state (arch_regs_t) on the stack
+        ; Restore general purpose registers except rax (it's already do_syscall return value)
+        POP_REGS 0
+        ; Skip irq_num and errcode
+        add rsp, 16
+        ; Restore RIP (sysret expects it in rcx)
+        pop rcx
+        ; Ignore cs
+        add rsp, 8
+        ; Restore RFLAGS (sysret expects it in r11)
+        pop r11
+        ; Disable interrupts before stack switch
+        cli
+        ; Restore user stack
+        mov rsp, qword [rsp]
+        ; Return to user task
         o64 sysret
 
     global pop_and_iret
     pop_and_iret:
+        ; Restore general purpose registers
         POP_REGS
         ; Skip error code and IRQ number
         add rsp, 16
+        ; Jump to user task
         iretq

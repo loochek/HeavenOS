@@ -9,11 +9,12 @@ OBJ_ALLOC_DEFINE(vmem_area_alloc, vmem_area_t);
 static vmem_t *curr_vmem = NULL;
 
 static uint64_t vmem_convert_flags(uint64_t flags);
+static uint64_t vmem_unconvert_flags(uint64_t flags);
 static vmem_area_t *vmem_is_mapped(vmem_t* vm, uint64_t addr);
 static bool vmem_intersects(vmem_t* vm, uint64_t other_start_addr, uint64_t other_size);
 static void vmem_unmap_page (vmem_t* vm, void* virt_addr);
 static void* vmem_ensure_next_table(pte_t* tbl, size_t idx, uint64_t raw_flags);
-static int vmem_clone_pages(vmem_t* dst, vmem_t* src);
+static int vmem_clone_pages(vmem_t* dst, pml4_t* src_pml4);
 
 int vmem_alloc_pages(vmem_t* vm, void* virt_addr, size_t pgcnt, uint64_t flags)
 {
@@ -73,19 +74,23 @@ int vmem_init(vmem_t* vm)
         return -ENOMEM;
 
     vm->areas_list = object_alloc(&vmem_area_alloc);
+    if (vm->areas_list == NULL)
+        return -ENOMEM;
+
     list_init(&vm->areas_list->node);
     return 0;
 }
 
 int vmem_init_from_current(vmem_t* vm)
 {
-    vm->areas_list = object_alloc(&vmem_area_alloc);
-    list_init(&vm->areas_list->node);
-    vm->pml4 = PHYS_TO_VIRT(x86_read_cr3());
-    /// TODO: clone
-    // vm->pml4 = vmem_clone_page_table(PHYS_TO_VIRT(x86_read_cr3()));
-    if (vm->pml4 == NULL)
-        return -ENOMEM;
+    int res = vmem_init(vm);
+    if (res < 0)
+        return res;
+
+    // Clone virtual memory mapping
+    res = vmem_clone_pages(vm, PHYS_TO_VIRT(x86_read_cr3()));
+    if (res < 0)
+        return res;
 
     return 0;
 }
@@ -103,6 +108,9 @@ int vmem_clone(vmem_t* dst, vmem_t* src)
     {
         vmem_area_t *area = (vmem_area_t*)area_node;
         vmem_area_t *copy = object_alloc(&vmem_area_alloc);
+        if (copy == NULL)
+            return -ENOMEM;
+
         copy->start = area->start;
         copy->size  = area->size;
         copy->flags = area->flags;
@@ -113,9 +121,9 @@ int vmem_clone(vmem_t* dst, vmem_t* src)
     }
 
     // Clone virtual memory mapping and physical frames allocated by vmem_alloc_pages
-    dst->pml4 = vmem_clone_pages(dst, src);
-    if (dst->pml4 == NULL)
-        return -ENOMEM;
+    res = vmem_clone_pages(dst, src->pml4);
+    if (res < 0)
+        return res;
 
     return 0;
 }
@@ -129,6 +137,16 @@ void vmem_switch_to(vmem_t* vm)
 // TODO: seems to be correct - check
 void vmem_destroy(vmem_t* vm)
 {
+    // Free areas list
+    while (list_empty(&vm->areas_list->node))
+    {
+        list_node_t *to_pop = vm->areas_list->node.next;
+        list_extract(to_pop);
+        object_free(&vmem_area_alloc, to_pop);
+    }
+
+    object_free(&vmem_area_alloc, vm->areas_list);
+
     // Free page table
     for (size_t pml4ei = 0; pml4ei < 512; pml4ei++)
     {
@@ -143,50 +161,47 @@ void vmem_destroy(vmem_t* vm)
             if (!(pdpte & PTE_PRESENT))
                 continue;
 
-            if (!(pdpte & PTE_PAGE_SIZE))
+            if (pdpte & PTE_PAGE_SIZE)
             {
-                pgdir_t *pd = PHYS_TO_VIRT(PTE_ADDR(pdpte));
-                for (int pdei = 0; pdei < 512; pdei++)
+                // 1GB pages are not allocated by vmem_alloc_pages
+                continue;
+            }
+
+            pgdir_t *pd = PHYS_TO_VIRT(PTE_ADDR(pdpte));
+            for (int pdei = 0; pdei < 512; pdei++)
+            {
+                pte_t pde = pd->entries[pdei];
+                if (!(pde & PTE_PRESENT))
+                    continue;
+
+                if (pde & PTE_PAGE_SIZE)
                 {
-                    pte_t pde = pd->entries[pdei];
-                    if (!(pde & PTE_PRESENT))
-                        continue;
-
-                    if (!(pde & PTE_PAGE_SIZE))
-                    {
-                        pgtbl_t *pt = PHYS_TO_VIRT(PTE_ADDR(pde));
-                        for (int ptei = 0; ptei < 512; ptei++)
-                        {
-                            pte_t pte = pt->entries[ptei];
-                            if (!(pte & PTE_PRESENT))
-                                continue;
-
-                            if (pte & PTE_ALLOC)
-                                frame_free(PTE_ADDR(pte));
-                        }
-
-                        frame_free(PTE_ADDR(pde));
-                    }
+                    // 2MB pages are not allocated by vmem_alloc_pages
+                    continue;
                 }
 
-                frame_free(PTE_ADDR(pdpte));
+                pgtbl_t *pt = PHYS_TO_VIRT(PTE_ADDR(pde));
+                for (int ptei = 0; ptei < 512; ptei++)
+                {
+                    pte_t pte = pt->entries[ptei];
+                    if (!(pte & PTE_PRESENT))
+                        continue;
+
+                    // Free page if it's marked as allocated by vmem_alloc_pages
+                    if (pte & VMEM_ALLOC)
+                        frame_free(PHYS_TO_VIRT(PTE_ADDR(pte)));
+                }
+
+                frame_free(pt);
             }
+
+            frame_free(pd);
         }
 
-        frame_free(PTE_ADDR(pml4e));
+        frame_free(pdpt);
     }
 
     frame_free(vm->pml4);
-
-    // Free areas list
-    while (list_empty(&vm->areas_list->node))
-    {
-        list_node_t *to_pop = vm->areas_list->node.next;
-        list_extract(to_pop);
-        object_free(&vmem_area_alloc, to_pop);
-    }
-
-    object_free(&vmem_area_alloc, vm->areas_list);
 }
 
 int vmem_map_page(vmem_t* vm, void* virt_addr, void* frame, uint64_t flags)
@@ -261,7 +276,7 @@ bool vmem_handle_pf(void* fault_addr)
     if (!frame)
         panic("Can't map page: out of memory");
 
-    int status = vmem_map_page(curr_vmem, ROUNDDOWN(fault_addr, PAGE_SIZE), frame, area->flags | PTE_ALLOC);
+    int status = vmem_map_page(curr_vmem, ROUNDDOWN(fault_addr, PAGE_SIZE), frame, area->flags | VMEM_ALLOC);
     if (status < 0)
         panic("Can't map page: %i", status);
 
@@ -277,10 +292,25 @@ static uint64_t vmem_convert_flags(uint64_t flags)
     if (flags & VMEM_WRITE)
         pte_flags |= PTE_WRITEABLE;
 
-    if (flags & PTE_ALLOC)
+    if (flags & VMEM_ALLOC)
         pte_flags |= PTE_ALLOC;
 
     return pte_flags;
+}
+
+static uint64_t vmem_unconvert_flags(uint64_t flags)
+{
+    uint64_t vmem_flags = 0;
+    if (flags & PTE_USER)
+        vmem_flags |= VMEM_USER;
+
+    if (flags & PTE_WRITEABLE)
+        vmem_flags |= VMEM_WRITE;
+
+    if (flags & PTE_ALLOC)
+        vmem_flags |= VMEM_ALLOC;
+
+    return vmem_flags;
 }
 
 static vmem_area_t *vmem_is_mapped(vmem_t* vm, uint64_t addr)
@@ -333,8 +363,8 @@ static void vmem_unmap_page(vmem_t* vm, void* virt_addr)
 
     pgtbl_t* pgtbl = PHYS_TO_VIRT(PTE_ADDR(pde));
     pte_t pte = pgtbl->entries[PTE_FROM_ADDR(virt_addr)];
-    if (pte & PTE_ALLOC)
-        frame_free(PTE_ADDR(pte));
+    if (pte & VMEM_ALLOC)
+        frame_free(PHYS_TO_VIRT(PTE_ADDR(pte)));
 
     pgtbl->entries[PTE_FROM_ADDR(virt_addr)] = 0;
 }
@@ -352,9 +382,7 @@ static void* vmem_ensure_next_table(pte_t* tbl, size_t idx, uint64_t raw_flags)
     {
         next_tbl = frame_alloc();
         if (next_tbl == NULL)
-        {
             return NULL;
-        }
 
         memset(next_tbl, 0, PAGE_SIZE);
         tbl[idx] = (uint64_t)VIRT_TO_PHYS(next_tbl) | PTE_PRESENT | raw_flags;
@@ -363,8 +391,96 @@ static void* vmem_ensure_next_table(pte_t* tbl, size_t idx, uint64_t raw_flags)
     return next_tbl;
 }
 
-static int vmem_clone_pages(vmem_t* dst, vmem_t* src)
+/// TODO: check
+static int vmem_clone_pages(vmem_t* dst, pml4_t* src_pml4)
 {
-    /// TODO:
-    return NULL;
+    printk("vmem_clone_pages: start\n");
+    for (size_t pml4ei = 0; pml4ei < 512; pml4ei++)
+    {
+        pte_t pml4e = src_pml4->entries[pml4ei];
+        if (!(pml4e & PTE_PRESENT))
+            continue;
+
+        pdpt_t *pdpt = PHYS_TO_VIRT(PTE_ADDR(pml4e));
+        for (size_t pdpei = 0; pdpei < 512; pdpei++)
+        {
+            pte_t pdpte = pdpt->entries[pdpei];
+            if (!(pdpte & PTE_PRESENT))
+                continue;
+
+            if (pdpte & PTE_PAGE_SIZE)
+            {
+                // 1GB pages are not allocated by vmem_alloc_pages
+                // They are mapped to the same physical frames as in the source vmem
+
+                uint64_t virt_addr = MAKE_ADDR(pml4ei, pdpei, 0, 0, 0);
+                uint64_t phys_addr = (uint64_t)PTE_ADDR(pdpte);
+                uint64_t flags = vmem_unconvert_flags(pdpte & PTE_FLAGS_MASK);
+                int res = vmem_map_page_1gb(dst, (void*)virt_addr, (void*)phys_addr, flags);
+                if (res < 0)
+                    return res;
+
+                continue;
+            }
+
+            pgdir_t *pd = PHYS_TO_VIRT(PTE_ADDR(pdpte));
+            for (int pdei = 0; pdei < 512; pdei++)
+            {
+                pte_t pde = pd->entries[pdei];
+                if (!(pde & PTE_PRESENT))
+                    continue;
+
+                if (pde & PTE_PAGE_SIZE)
+                {
+                    // 2MB pages are not allocated by vmem_alloc_pages
+                    // They are mapped to the same physical frames as in the source vmem
+
+                    uint64_t virt_addr = MAKE_ADDR(pml4ei, pdpei, pdei, 0, 0);
+                    uint64_t phys_addr = (uint64_t)PTE_ADDR(pde);
+                    uint64_t flags = vmem_unconvert_flags(pde & PTE_FLAGS_MASK);
+                    int res = vmem_map_page_2mb(dst, (void*)virt_addr, (void*)phys_addr, flags);
+                    if (res < 0)
+                        return res;
+
+                    continue;
+                }
+
+                pgtbl_t *pt = PHYS_TO_VIRT(PTE_ADDR(pde));
+                for (int ptei = 0; ptei < 512; ptei++)
+                {
+                    pte_t pte = pt->entries[ptei];
+                    if (!(pte & PTE_PRESENT))
+                        continue;
+
+                    uint64_t virt_addr = MAKE_ADDR(pml4ei, pdpei, pdei, ptei, 0);
+                    uint64_t src_phys_addr = (uint64_t)PTE_ADDR(pte);
+                    uint64_t flags = vmem_unconvert_flags(pte & PTE_FLAGS_MASK);
+
+                    if (pte & PTE_ALLOC)
+                    {
+                        // Clone page if it's marked as allocated by vmem_alloc_pages
+                        void* phys_frame_copy = frame_alloc();
+                        if (phys_frame_copy == NULL)
+                            return -ENOMEM;
+
+                        memcpy(phys_frame_copy, PHYS_TO_VIRT(src_phys_addr), PAGE_SIZE);
+                        int res = vmem_map_page(dst,
+                            (void*)virt_addr, VIRT_TO_PHYS(phys_frame_copy), flags | VMEM_ALLOC);
+                        if (res < 0)
+                            return res;
+                    }
+                    else
+                    {
+                        // Otherwise, just map to the same physical frames as in the source vmem
+                        int res = vmem_map_page(dst, (void*)virt_addr, (void*)src_phys_addr, flags);
+                        if (res < 0)
+                            return res;
+                    }
+                }
+            }
+        }
+    }
+
+    printk("vmem_clone_pages: successful finish\n");
+    return 0;
 }

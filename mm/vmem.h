@@ -8,6 +8,9 @@
 #define VMEM_NO_FLAGS 0
 #define VMEM_USER     (1 << 0)
 #define VMEM_WRITE    (1 << 1)
+// Custom bit - used to mark pages that have been allocated by vmem_alloc_pages
+// (i.e. must be freed when vmem is destroyed)
+#define VMEM_ALLOC (1 << 2)
 
 /// Structure which describes continious mapping region
 typedef struct vmem_area
@@ -119,7 +122,6 @@ int vmem_map_page_1gb(vmem_t* vm, void* virt_addr, void* frame, uint64_t flags);
 
 /**
  * Frees memory occupied by given address space. 
- * Must be called only for address spaces created by vmem_init
  * Address space becomes not usable anymore.
  * 
  * \param vm Address space

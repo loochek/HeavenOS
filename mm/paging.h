@@ -26,6 +26,9 @@
 #define PHYS_TO_VIRT(addr) ((void*)(KERNEL_DIRECT_PHYS_MAPPING_START + (uint64_t)(addr)))
 #define VIRT_TO_PHYS(addr) ((void*)((uint64_t)(addr) - KERNEL_DIRECT_PHYS_MAPPING_START))
 
+#define MAKE_ADDR(m, p, d, t, o) \
+    ((((uint64_t)(m) << 39 | (uint64_t)(p) << 30 | (uint64_t)(d) << 21 | (uint64_t)(t) << 12 | (o))) | ((((m) >> 8) & 0x1) ? ((((uint64_t)1 << 16) - 1) << 48) : 0))
+
 typedef uint64_t pte_t;
 
 typedef struct pml4

@@ -170,9 +170,16 @@ int arch_thread_clone(arch_thread_t* dst, arch_regs_t** regs, arch_thread_t* src
     if (err < 0)
         return err;
 
-    // Copy stack contents
-    memcpy(dst->kstack_top, src->kstack_top, PAGE_SIZE);
-    dst->context.rsp -= (uint64_t)src->kstack_top - src->context.rsp;
+    // Clone stack contents (arch_regs_t is already on src kstack)
+    memcpy(dst->kstack_top - PAGE_SIZE, src->kstack_top - PAGE_SIZE, PAGE_SIZE);
+    dst->context.rsp = (uint64_t)(dst->kstack_top - ((uint64_t)src->kstack_top - src->context.rsp));
+
+    if (regs != NULL)
+        *regs = (arch_regs_t*)dst->context.rsp;
+
+    dst->context.rsp -= sizeof(on_stack_context_t);
+    on_stack_context_t* onstack_ctx = (on_stack_context_t*)dst->context.rsp;
+    onstack_ctx->ret_addr = (uint64_t)pop_and_iret;
     return 0;
 }
 

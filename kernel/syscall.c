@@ -50,20 +50,24 @@ static int64_t sys_getpid(arch_regs_t* regs)
 
 static int64_t sys_fork(arch_regs_t* parent_regs)
 {
-    (void)parent_regs;
+    UNUSED(parent_regs);
 
     task_t* child = sched_allocate_task();
+
     int res = vmem_clone(&child->vmem, &sched_current()->vmem);
     if (res < 0)
         return res;
 
-    res = arch_thread_clone(&child->arch_thread, NULL, &sched_current()->arch_thread);
+    arch_regs_t* child_regs = NULL;
+    res = arch_thread_clone(&child->arch_thread, &child_regs, &sched_current()->arch_thread);
     if (res < 0)
         return res;
 
     child->ppid = sched_current()->pid;
     child->state = TASK_RUNNABLE;
-    return 0;
+
+    child_regs->rax = 0;
+    return child->pid;
 }
 
 static _Noreturn int64_t sys_exit(arch_regs_t* regs)

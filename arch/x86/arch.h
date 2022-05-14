@@ -42,14 +42,48 @@ typedef struct __attribute__((packed))
 typedef struct
 {
     uint8_t* kstack_top;
-    uint8_t saved_rsp;
     context_t context;
 } arch_thread_t;
 
+/**
+ * Initializes machine
+ */
 void arch_init();
+
+/**
+ * Initializes new machine execution context
+ * 
+ * \param thread Context
+ * \param regs Writes pointer to context's registers here if is not NULL
+ * 
+ * \return Error code
+ */
 int arch_thread_new(arch_thread_t* thread, arch_regs_t** regs);
+
+/**
+ * Clones machine execution context
+ * 
+ * \param dst Destination context
+ * \param regs Writes pointer to destination context's registers here if is not NULL
+ * \param src Source context
+ * 
+ * \return Error code
+ */
 int arch_thread_clone(arch_thread_t* dst, arch_regs_t** regs, arch_thread_t* src);
+
+/**
+ * Destroys machine execution context
+ * 
+ * \param thread Context
+ */
 void arch_thread_destroy(arch_thread_t* thread);
+
+/**
+ * Switches machine execution context
+ * 
+ * \param prev Previous context
+ * \param next Next context
+ */
 void arch_thread_switch(arch_thread_t* prev, arch_thread_t* next);
 
 #endif
