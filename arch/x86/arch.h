@@ -61,15 +61,16 @@ void arch_init();
 int arch_thread_new(arch_thread_t* thread, arch_regs_t** regs);
 
 /**
- * Clones machine execution context
+ * Clones current machine execution context. 
+ * Expects to have arch_regs_t on the top of the current task's kstack. 
+ * (so you can use this method safely at least in system calls handlers)
  * 
  * \param dst Destination context
  * \param regs Writes pointer to destination context's registers here if is not NULL
- * \param src Source context
  * 
  * \return Error code
  */
-int arch_thread_clone(arch_thread_t* dst, arch_regs_t** regs, arch_thread_t* src);
+int arch_thread_clone_current(arch_thread_t* dst, arch_regs_t** regs);
 
 /**
  * Destroys machine execution context

@@ -59,7 +59,7 @@ static int64_t sys_fork(arch_regs_t* parent_regs)
         return res;
 
     arch_regs_t* child_regs = NULL;
-    res = arch_thread_clone(&child->arch_thread, &child_regs, &sched_current()->arch_thread);
+    res = arch_thread_clone_current(&child->arch_thread, &child_regs);
     if (res < 0)
         return res;
 
@@ -113,14 +113,8 @@ static int64_t sys_wait(arch_regs_t* regs)
         vmem_area_t *area = vmem_is_mapped(&sched_current()->vmem, status);
         if (area == NULL || (area->flags & (VMEM_USER | VMEM_WRITE)) == 0)
         {
-            printk("sys_wait: status addr is not valid - terminating pid %d\n", sched_current()->pid);
-            sched_current()->exitcode = -EINVAL;
-            sched_current()->state = TASK_ZOMBIE;
-
-            // Go to scheduler
-            sched_switch();
-            // Scheduler mustn't schedule this task anymore
-            panic_on_reach();
+            // Invalid address or task doesn't have permission to write to it
+            return -EINVAL;
         }
 
         *status = tasks[child_pid].exitcode;

@@ -7,6 +7,8 @@
 #include <mm/paging.h>
 #include <mm/frame_alloc.h>
 #include <kernel/irq.h>
+#include <kernel/panic.h>
+#include <sched/sched.h>
 
 static x86_tss_t tss;
 
@@ -162,8 +164,12 @@ int arch_thread_new(arch_thread_t* th, arch_regs_t** result_regs)
     return 0;
 }
 
-int arch_thread_clone(arch_thread_t* dst, arch_regs_t** regs, arch_thread_t* src)
+int arch_thread_clone_current(arch_thread_t* dst, arch_regs_t** regs)
 {
+    kassert_dbg(sched_current() != NULL);
+    
+    arch_thread_t* src = &sched_current()->arch_thread;
+
     int err = allocate_kstack(dst);
     if (err < 0)
         return err;

@@ -52,7 +52,7 @@ USER_CODE_SEG:   equ (4 << 3) | RPL_RING3
 %endmacro
 
 section .bss
-    saved_rsp:
+    rsp_scratch_space:
         resb 8
 
 ; This is an entry point for syscall instruction.
@@ -69,19 +69,18 @@ section .text
         ; We cannot use user-controlled rsp here:
         ; No stack switch will be performed if exception or interrupt occurs here since we are already in ring0.
         ; So, invalid rsp leads us to the double fault.
-        mov qword [saved_rsp], rsp
+        mov qword [rsp_scratch_space], rsp
         ; rsp = _current->arch_thread.kstack_top
         mov rsp, qword [_current]
         mov rsp, qword [rsp]
 
-        ; We have a reliable stack now, enable interrupts.
-        sti
+        ; We have a reliable stack now
 
         ; Save task state (arch_regs_t) on the stack
         ; ss
         push qword USER_DATA_SEG
         ; rsp
-        push qword [saved_rsp]
+        push qword [rsp_scratch_space]
         ; rflags
         push r11
         ; cs
@@ -94,6 +93,9 @@ section .text
         push qword 0
         ; General purpose registers
         PUSH_REGS
+
+        ; It's now safe to enable interrupts
+        sti
 
         ; do_syscall args
         mov rdi, rax
