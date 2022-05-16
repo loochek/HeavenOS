@@ -61,7 +61,7 @@ void arch_init();
 int arch_thread_new(arch_thread_t* thread, arch_regs_t** regs);
 
 /**
- * Clones current machine execution context. 
+ * Clones machine execution context of the current task. 
  * Expects to have arch_regs_t on the top of the current task's kstack. 
  * (so you can use this method safely at least in system calls handlers)
  * 
