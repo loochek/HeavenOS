@@ -5,6 +5,14 @@
 enum { PRINTK_BUF_SIZE = 11 };
 static const char digits[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
+const char* errcode_str[] =
+{
+    [0] = "no error",
+    [EINVAL] = "invalid value",
+    [ENOSYS] = "not implemented",
+    [ENOMEM] = "out of memory"
+};
+
 static size_t bprintu64(char* buf, uint64_t a, int base)
 {
     size_t i;
@@ -103,6 +111,10 @@ void vprintk_color(const char* fmt, va_list args, fb_color_t fg_color, fb_color_
                 str = va_arg(args, char*);
                 cons_print_color(str, fg_color, bg_color);
                 size = 0;
+                break;
+            case 'i':
+                s32value = va_arg(args, int32_t);
+                cons_print_color(errcode_str[-s32value], fg_color, bg_color);
                 break;
             default:
                 size = 0;

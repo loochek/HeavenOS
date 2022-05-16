@@ -1,8 +1,8 @@
-#include "common.h"
-#include "boot/early.h"
-#include "mm/paging.h"
-#include "mm/mem_layout.h"
-#include "arch/x86.h"
+#include <common.h>
+#include <boot/early.h>
+#include <mm/paging.h>
+#include <mm/mem_layout.h>
+#include <arch/x86/x86.h>
 
 #define EARLY_TEXT __attribute__((section(".early.text")))
 #define EARLY_BSS __attribute__((section(".early.bss")))

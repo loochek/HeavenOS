@@ -1,11 +1,12 @@
-#include "drivers/apic.h"
-#include "kernel/panic.h"
-#include "kernel/irq.h"
-#include "arch/x86.h"
-#include "mm/paging.h"
+#include <drivers/apic.h>
+#include <kernel/panic.h>
+#include <kernel/irq.h>
+#include <arch/x86/x86.h>
+#include <mm/paging.h>
+#include <sched/sched.h>
 
 // APIC timer period in milliseconds
-#define APIC_TIMER_PERIOD 1
+#define APIC_TIMER_PERIOD SCHED_TIMER_PERIOD
 
 // APIC callibration period in milliseconds
 #define CALLIBRATE_PERIOD 10
@@ -149,8 +150,8 @@ void apic_init()
         panic("Cannot locate Local APIC address");
 
     // Disable old PIC.
-    outb(0x20 + 1, 0xFF);
-    outb(0xA0 + 1, 0xFF);
+    x86_outb(0x20 + 1, 0xFF);
+    x86_outb(0xA0 + 1, 0xFF);
 
     // Enable APIC, by setting spurious interrupt vector and APIC Software Enabled/Disabled flag.
     lapic_write(APIC_SPURIOUS, IRQ_SPURIOUS | APIC_SW_ENABLE);
@@ -179,26 +180,26 @@ void apic_setup_timer()
 
     // Using PIT to callibrate APIC timer
     // PIT Channel 2 setup
-    outb(PIT_CMD, CMD_BINARY | CMD_MODE1 | CMD_RW_BOTH | CMD_COUNTER2);
+    x86_outb(PIT_CMD, CMD_BINARY | CMD_MODE1 | CMD_RW_BOTH | CMD_COUNTER2);
 
     int pit_divisor = PIT_FREQUENCY * CALLIBRATE_PERIOD / 1000;
-    outb(PIT_COUNTER2, pit_divisor);
-    outb(PIT_COUNTER2, pit_divisor >> 8);
+    x86_outb(PIT_COUNTER2, pit_divisor);
+    x86_outb(PIT_COUNTER2, pit_divisor >> 8);
     
     // ---- Measure start
 
     // PIT gate low
-    outb(PIT_GATE, inb(PIT_GATE) & (~CMD_CH2_IN));
+    x86_outb(PIT_GATE, x86_inb(PIT_GATE) & (~CMD_CH2_IN));
     // PIT gate high
-    outb(PIT_GATE, inb(PIT_GATE) | CMD_CH2_IN);
+    x86_outb(PIT_GATE, x86_inb(PIT_GATE) | CMD_CH2_IN);
     // PIT is counting now
     // Reset APIC timer counter
     lapic_write(APIC_TMRINITCNT, -1);
     // Wait PIT gate to be high
 #ifndef QEMU_PIT_HACK
-    while (!(inb(PIT_GATE) & CMD_CH2_OUT));
+    while (!(x86_inb(PIT_GATE) & CMD_CH2_OUT));
 #else
-    while (inb(PIT_GATE) & CMD_CH2_OUT);
+    while (x86_inb(PIT_GATE) & CMD_CH2_OUT);
 #endif
     // Disable APIC timer
     lapic_write(APIC_LVT_TMR, APIC_DISABLE);

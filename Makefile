@@ -17,8 +17,8 @@ endif
 
 export
 
-QEMU=qemu-system-x86_64 -m 2G
-QEMUFLAGS=-cdrom kernel.iso -monitor stdio
+QEMU=qemu-system-x86_64
+QEMUFLAGS=-cdrom kernel.iso -monitor stdio -m 2G
 
 ifdef EFI
 QEMUFLAGS+=-bios /usr/share/OVMF/x64/OVMF.fd
@@ -33,9 +33,11 @@ kernel.iso: kernel.bin
 
 kernel.bin:
 	$(MAKE) -C boot/
+	$(MAKE) -C arch/x86/
 	$(MAKE) -C drivers/
 	$(MAKE) -C kernel/
 	$(MAKE) -C mm/
+	$(MAKE) -C sched/
 	$(MAKE) -C utils/
 	$(LD) $(LDFLAGS) -T <(cpp -P -E linker.ld) -z max-page-size=4096 `find $(ROOT) -name '*.o'` -o kernel.bin
 	$(OBJCOPY) --only-keep-debug kernel.bin kernel.sym
@@ -49,9 +51,11 @@ qemu-gdb: kernel.iso
 
 clean:
 	$(MAKE) -C boot/ clean
+	$(MAKE) -C arch/x86/ clean
 	$(MAKE) -C drivers/ clean
 	$(MAKE) -C kernel/ clean
 	$(MAKE) -C mm/ clean
+	$(MAKE) -C sched/ clean
 	$(MAKE) -C utils/ clean
 	rm -f kernel.bin
 	rm -f kernel.sym
