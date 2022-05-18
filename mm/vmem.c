@@ -186,8 +186,8 @@ void vmem_destroy(vmem_t* vm)
                         continue;
 
                     // Free page if it's marked as allocated by vmem_alloc_pages
-                    // if (pte & PTE_ALLOC)
-                    //     frame_free(PHYS_TO_VIRT(PTE_ADDR(pte)));
+                    if (pte & PTE_ALLOC)
+                        frame_free(PHYS_TO_VIRT(PTE_ADDR(pte)));
                 }
 
                 frame_free(pt);
