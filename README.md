@@ -1,6 +1,6 @@
 # HeavenOS
 
-Simple educational operation system. Based on [HeLL OS](https://github.com/carzil/hellos), written as part of the [mipt-llp-2022](https://github.com/carzil/mipt-llp-2022) course.
+Simple educational operating system. Based on [HeLL OS](https://github.com/carzil/hellos), written as part of the [mipt-llp-2022](https://github.com/carzil/mipt-llp-2022) course.
 
 ## Building and running
 Requires GCC cross-compiler (can be replaced with Clang), NASM and `grub-mkrescue` for creating bootable ISO.
